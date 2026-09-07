@@ -5,11 +5,47 @@
 // Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
 
 generator client {
-  provider = "prisma-client"
-  output   = "../generated/prisma"
+  provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+
+model User {
+  id           String     @id @default(uuid())
+  name         String
+  email        String     @unique
+  passwordHash String
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  shortUrls    ShortURL[]
+  @@map("users")
+}
+model ShortURL {
+  id          String           @id @default(cuid())
+  userId      String
+  originalUrl String
+  shortCode   String           @unique
+  clickCount  Int              @default(0)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  analytics   ClickAnalytics[]
+  @@index([userId, createdAt(sort: Desc), id(sort: Desc)])
+  @@map("short_urls")
+}
+model ClickAnalytics {
+  id         String   @id @default(cuid())
+  shortUrlId String
+  clickedAt  DateTime @default(now())
+  ipAddress  String?
+  userAgent  String?
+  referrer   String?
+  country    String?
+  shortUrl   ShortURL @relation(fields: [shortUrlId], references: [id], onDelete: Cascade)
+  @@index([shortUrlId, clickedAt(sort: Desc), id(sort: Desc)])
+  @@map("click_analytics")
+}
+
