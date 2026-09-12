@@ -10,6 +10,11 @@ export const envSchema = z.object({
   ACCESS_TOKEN_EXPIRES_IN: z.string().default("15m"),
   REFRESH_TOKEN_EXPIRES_IN: z.string().default("7d"),
   URL_SHORTCODE_LENGTH: z.coerce.number().default(7),
+  REDIS_HOST: z.string(),
+  REDIS_PORT: z.coerce.number(),
+  URL_CACHE_TTL: z.coerce.number(),
+  JITTER_PERCENT: z.coerce.number(),
+
 });
 
 export type Env = z.infer<typeof envSchema>;

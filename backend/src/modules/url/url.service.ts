@@ -9,6 +9,14 @@ import { IUrlRepository } from "./url.interface.js";
 import { UpdateUrlInputType, UrlInputType } from "./url.schema.js";
 import { PaginatedResponse } from "./url.types.js";
 import { ShortURL } from "@prisma/client";
+import { getShortUrlCacheKey } from "./cache/cache.helper.js";
+import {
+  getUrlCache,
+  setUrlCache,
+  deleteUrlCache,
+} from "./cache/cache.service.js";
+import { logger } from "../../config/logger.js";
+import { bloomService } from "../bloom/bloom.container.js";
 
 export class UrlService {
   // Dependency Inversion: depends on the interface contract
@@ -37,6 +45,21 @@ export class UrlService {
         shortCode,
       });
 
+      // Add shortCode to Bloom Filter after successful database creation
+      try {
+        await bloomService.add(shortCode);
+        logger.info({
+          event: "BLOOM_FILTER_UPDATED",
+          shortCode,
+        });
+      } catch (error) {
+        logger.warn({
+          event: "BLOOM_FILTER_UPDATE_FAILED",
+          shortCode,
+          error: error instanceof Error ? error.message : "Unknown error",
+        });
+      }
+
       return shortUrl;
     }
 
@@ -47,21 +70,76 @@ export class UrlService {
     );
   }
 
-  // 2. Fetch Destination for 302 Redirection
+  // 2. Fetch Destination for 302 Redirection (Cache-Aside Pattern)
   async getOriginalUrlFromShortCode(
     shortCode: string
-  ): Promise<{ originalUrl: string; shortUrlId: string }> {
-    const shortUrl = await this.urlRepo.findShortUrlByShortCode(shortCode);
+  ): Promise<{ shortUrlId: string; originalUrl: string }> {
+    // 1. Bloom Filter Check (Defends against Cache Penetration)
+    let mightExist = true;
+    try {
+      mightExist = await bloomService.mightExist(shortCode);
+    } catch (error) {
+      logger.warn({
+        event: "BLOOM_CHECK_FAILED_FAILING_OPEN",
+        shortCode,
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
 
+    if (!mightExist) {
+      logger.info({
+        event: "BLOOM_FILTER_NEGATIVE",
+        shortCode,
+      });
+      throw new AppError("Short Url not found", 404);
+    }
+
+    logger.info({
+      event: "BLOOM_FILTER_POSITIVE",
+      shortCode,
+    });
+
+    const cacheKey = getShortUrlCacheKey(shortCode);
+
+    // 2. Check Redis Cache
+    const cachedUrl = await getUrlCache(cacheKey);
+    if (cachedUrl) {
+      logger.info({
+        event: "CACHE_HIT",
+        shortCode,
+      });
+      return cachedUrl;
+    }
+
+    logger.info({
+      event: "CACHE_MISS",
+      shortCode,
+    });
+
+    // 3. Query Database on Cache Miss
+    const shortUrl = await this.urlRepo.findShortUrlByShortCode(shortCode);
     if (!shortUrl) {
+      logger.warn({
+        event: "BLOOM_FALSE_POSITIVE",
+        shortCode,
+      });
       throw new AppError("Short URL not found", 404);
     }
 
-    // Returning both originalUrl and id makes wiring analytics seamless
-    return {
-      originalUrl: shortUrl.originalUrl,
+    const response = {
       shortUrlId: shortUrl.id,
+      originalUrl: shortUrl.originalUrl,
     };
+
+    // 4. Populate Redis Cache
+    await setUrlCache(cacheKey, response);
+
+    logger.info({
+      event: "CACHE_REBUILT",
+      shortCode,
+    });
+
+    return response;
   }
 
   // 3. High-Performance Cursor-Based Link Listing (Peek-Ahead Pattern)
@@ -132,6 +210,12 @@ export class UrlService {
       throw new AppError("Failed to update short URL", 500);
     }
 
+    // Update Redis cache with the new destination URL
+    await setUrlCache(getShortUrlCacheKey(updatedShortUrl.shortCode), {
+      shortUrlId: updatedShortUrl.id,
+      originalUrl: updatedShortUrl.originalUrl,
+    });
+
     return updatedShortUrl;
   }
 
@@ -156,5 +240,8 @@ export class UrlService {
 
     // 4. Delete the URL from database
     await this.urlRepo.deleteShortUrl(shortUrl.shortCode);
+
+    // Invalidate Redis cache
+    await deleteUrlCache(getShortUrlCacheKey(shortUrl.shortCode));
   }
 }

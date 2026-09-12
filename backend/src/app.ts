@@ -18,21 +18,21 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-// 1. Health check routes
+
 app.use("/health", healthRouter);
 app.use("/api/v1/health", healthRouter);
 
-// 2. Public Short URL Redirection (GET /r/:shortCode)
+
 app.get("/r/:shortCode", urlController.redirectToOriginalURL);
 
-// 3. Feature Routes
+
 app.use("/api/v1/auth", authRouter);
 app.use("/api/v1/urls", urlRouter);
 
-// 4. Unhandled route handler (404)
+
 app.use((req, _res, next) => {
   next(new AppError(`Cannot find ${req.originalUrl} on this server`, 404));
 });
 
-// 5. Global Error Handler (MUST BE AT THE VERY BOTTOM!)
+
 app.use(globalErrorHandler);
