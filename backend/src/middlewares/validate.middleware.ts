@@ -19,6 +19,15 @@ export const validate =
     }
 
     // Cleaned/trimmed data
-    req[target] = result.data;
+    if (target === "query") {
+      Object.defineProperty(req, "query", {
+        value: result.data,
+        writable: true,
+        enumerable: true,
+        configurable: true,
+      });
+    } else {
+      req[target] = result.data;
+    }
     next();
   };

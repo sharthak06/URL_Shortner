@@ -42,10 +42,13 @@ export const authMiddleware = (
       return next(new AppError("Token expired", 401));
     }
 
-    if (error instanceof jwt.JsonWebTokenError) {
+    if (
+      error instanceof jwt.JsonWebTokenError ||
+      error instanceof SyntaxError
+    ) {
       return next(new AppError("Invalid token", 401));
     }
 
-    return next(error);
+    return next(new AppError("Authentication failed", 401));
   }
 };

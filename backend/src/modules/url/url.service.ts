@@ -134,4 +134,27 @@ export class UrlService {
 
     return updatedShortUrl;
   }
+
+  // 5. Delete Short URL (with Existence and Ownership Guards)
+  async deleteShortUrl(userId: string, identifier: string): Promise<void> {
+    // 1. Look up by shortCode first
+    let shortUrl = await this.urlRepo.findShortUrlByShortCode(identifier);
+
+    // 2. If not found by shortCode, check if identifier matches cuid id
+    if (!shortUrl) {
+      shortUrl = await this.urlRepo.findShortUrlByIdAndUserId(identifier, userId);
+    }
+
+    if (!shortUrl) {
+      throw new AppError("Short URL not found", 404);
+    }
+
+    // 3. Authorization Guard: Prevent users from deleting links they don't own
+    if (shortUrl.userId !== userId) {
+      throw new AppError("You are not allowed to perform this action", 403);
+    }
+
+    // 4. Delete the URL from database
+    await this.urlRepo.deleteShortUrl(shortUrl.shortCode);
+  }
 }

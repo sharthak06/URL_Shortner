@@ -3,6 +3,7 @@ import cors from "cors";
 import cookieParser from "cookie-parser";
 import helmet from "helmet";
 
+import healthRouter from "./modules/health/health.route.js";
 import authRouter from "./modules/auth/auth.route.js";
 import urlRouter from "./modules/url/url.route.js";
 import { urlController } from "./modules/url/url.container.js";
@@ -17,10 +18,9 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-// 1. Health check route
-app.get("/health", (req, res) => {
-  res.status(200).json({ status: "ok", message: "Server is healthy" });
-});
+// 1. Health check routes
+app.use("/health", healthRouter);
+app.use("/api/v1/health", healthRouter);
 
 // 2. Public Short URL Redirection (GET /r/:shortCode)
 app.get("/r/:shortCode", urlController.redirectToOriginalURL);

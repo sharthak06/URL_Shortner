@@ -31,7 +31,14 @@ urlRouter.patch(
   urlController.updateOriginalUrl
 );
 
-// 4. Public Redirection Endpoint (GET /api/v1/urls/r/:shortCode)
+// 4. Delete Short URL Endpoint (DELETE /api/v1/urls/:shortCode)
+urlRouter.delete(
+  "/:shortCode",
+  authMiddleware,
+  urlController.deleteShortUrl
+);
+
+// 5. Public Redirection Endpoint (GET /api/v1/urls/r/:shortCode)
 urlRouter.get("/r/:shortCode", urlController.redirectToOriginalURL);
 
 export default urlRouter;

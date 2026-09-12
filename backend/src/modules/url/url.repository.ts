@@ -60,5 +60,13 @@ export class UrlRepository implements IUrlRepository {
       data,
     });
   }
+
+  async deleteShortUrl(shortCode: string): Promise<ShortURL> {
+    return await prisma.shortURL.delete({
+      where: {
+        shortCode,
+      },
+    });
+  }
 }
   

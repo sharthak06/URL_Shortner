@@ -10,7 +10,7 @@ const isHttpOrHttps = (url: string): boolean => {
   }
 };
 
-// 1. Creation Schema (POST /api/v1/urls/create-short-url)
+// 1. Creation Schema (POST /api/v1/urls)
 export const createUrlSchema = z
   .object({
     originalUrl: z

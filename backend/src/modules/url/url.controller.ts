@@ -97,4 +97,26 @@ export class URLController {
       return res.redirect(302, originalUrl);
     }
   );
+
+  // 5. Delete Short URL (DELETE /api/v1/urls/:shortCode)
+  deleteShortUrl = catchAsync(
+    async (req: Request, res: Response, next: NextFunction) => {
+      const userId = req.user?.userId;
+      if (!userId) {
+        throw new AppError("Authentication required", 401);
+      }
+
+      const { shortCode } = req.params;
+      if (!shortCode || typeof shortCode !== "string") {
+        throw new AppError("Valid short code parameter is required", 400);
+      }
+
+      await this.urlService.deleteShortUrl(userId, shortCode);
+
+      return sendResponse(res, 200, {
+        success: true,
+        message: "Short URL deleted successfully",
+      });
+    }
+  );
 }

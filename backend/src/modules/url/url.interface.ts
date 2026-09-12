@@ -14,4 +14,5 @@ export interface IUrlRepository {
     shortCode: string,
     data: UpdateShortUrlType
   ): Promise<ShortURL | null>;
+  deleteShortUrl(shortCode: string): Promise<ShortURL>;
 }
