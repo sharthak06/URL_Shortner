@@ -9,6 +9,7 @@ export const envSchema = z.object({
   REFRESH_TOKEN_SECRET: z.string().min(1, "REFRESH_TOKEN_SECRET is required"),
   ACCESS_TOKEN_EXPIRES_IN: z.string().default("15m"),
   REFRESH_TOKEN_EXPIRES_IN: z.string().default("7d"),
+  URL_SHORTCODE_LENGTH: z.coerce.number().default(7),
 });
 
 export type Env = z.infer<typeof envSchema>;
