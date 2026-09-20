@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { urlController } from "./url.container.js";
+import { analyticsController } from "../analytics/analytics.container.js";
 import { authMiddleware } from "../../middlewares/auth.middleware.js";
 import { validate } from "../../middlewares/validate.middleware.js";
 import {
@@ -7,6 +8,10 @@ import {
   updateUrlSchema,
   getUserUrlsQuerySchema,
 } from "./url.schema.js";
+import {
+  getLinkAnalyticsParamsSchema,
+  getLinkAnalyticsQuerySchema,
+} from "../analytics/analytics.schema.js";
 
 const urlRouter = Router();
 
@@ -24,6 +29,15 @@ urlRouter.get(
   urlController.getUserUrls
 );
 
+// 3. Protected Analytics Query (GET /api/v1/urls/:id/analytics)
+urlRouter.get(
+  "/:id/analytics",
+  authMiddleware,
+  validate(getLinkAnalyticsParamsSchema, "params"),
+  validate(getLinkAnalyticsQuerySchema, "query"),
+  analyticsController.getLinkAnalytics
+);
+
 urlRouter.patch(
   "/:shortCode",
   authMiddleware,
@@ -31,14 +45,14 @@ urlRouter.patch(
   urlController.updateOriginalUrl
 );
 
-// 4. Delete Short URL Endpoint (DELETE /api/v1/urls/:shortCode)
+// 5. Delete Short URL Endpoint (DELETE /api/v1/urls/:shortCode)
 urlRouter.delete(
   "/:shortCode",
   authMiddleware,
   urlController.deleteShortUrl
 );
 
-// 5. Public Redirection Endpoint (GET /api/v1/urls/r/:shortCode)
+// 6. Public Redirection Endpoint (GET /api/v1/urls/r/:shortCode)
 urlRouter.get("/r/:shortCode", urlController.redirectToOriginalURL);
 
 export default urlRouter;

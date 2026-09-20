@@ -3,6 +3,7 @@ import { catchAsync } from "../../utils/common/CatchAsync.js";
 import { AppError } from "../../utils/Errors/AppError.js";
 import { sendResponse } from "../../utils/response/sendResponse.js";
 import { UrlService } from "./url.service.js";
+import { addClickToAnalyticsQueue } from "../../queues/analyticsQueue.js";
 
 export class URLController {
   constructor(private readonly urlService: UrlService) {}
@@ -89,8 +90,32 @@ export class URLController {
         throw new AppError("Valid short code parameter is required", 400);
       }
 
-      const { originalUrl } =
+      const { shortUrlId, originalUrl } =
         await this.urlService.getOriginalUrlFromShortCode(shortCode);
+
+      // Extract client metadata for asynchronous analytics ingestion
+      const rawForwarded = req.headers["x-forwarded-for"];
+      const ipAddress =
+        (typeof rawForwarded === "string"
+          ? rawForwarded.split(",")[0].trim()
+          : req.socket.remoteAddress) || req.ip || null;
+
+      const userAgent =
+        typeof req.headers["user-agent"] === "string"
+          ? req.headers["user-agent"]
+          : null;
+
+      const rawReferrer = req.headers["referer"] || req.headers["referrer"];
+      const referrer = typeof rawReferrer === "string" ? rawReferrer : null;
+
+      // Dispatches click event to BullMQ without blocking redirection UX
+      await addClickToAnalyticsQueue({
+        shortUrlId,
+        ipAddress,
+        userAgent,
+        referrer,
+        clickedAt: new Date().toISOString(),
+      });
 
       // Use 302 Found (Temporary Redirect) so browsers don't cache the destination,
       // ensuring every click hits the server for accurate analytics
