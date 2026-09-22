@@ -3,6 +3,7 @@ import { authController } from "./auth.container.js";
 import { validate } from "../../middlewares/validate.middleware.js";
 import { authMiddleware } from "../../middlewares/auth.middleware.js";
 import { registerUserSchema, loginUserSchema } from "./auth.schema.js";
+import { loginSlidingWindowRateLimit } from "../../middlewares/rate-limit/login-sliding-window-rate-limit.js";
 
 const authRouter = Router();
 
@@ -15,6 +16,7 @@ authRouter.post(
 
 authRouter.post(
   "/login",
+  loginSlidingWindowRateLimit,
   validate(loginUserSchema),
   authController.login
 );

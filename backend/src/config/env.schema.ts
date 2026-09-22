@@ -15,6 +15,22 @@ export const envSchema = z.object({
   URL_CACHE_TTL: z.coerce.number(),
   JITTER_PERCENT: z.coerce.number(),
 
+  // Distributed Lock Tuning
+  LOCK_TTL_SECONDS: z.coerce.number().default(5),
+
+  // Proactive Cache Warmer Configuration
+  HOT_URL_CACHE_TTL_HOURS: z.coerce.number().default(24),
+  CACHE_WARMER_EVERY_MINUTES: z.coerce.number().default(15),
+  WARM_HOT_URLS_LIMIT: z.coerce.number().default(50),
+
+  // Multi-Tier Rate Limiting Configuration
+  GLOBAL_RATE_LIMIT_WINDOW: z.coerce.number().default(15), // minutes
+  GLOBAL_RATE_LIMIT_SIZE: z.coerce.number().default(100), // requests per window
+  LOGIN_RATE_LIMIT_WINDOW: z.coerce.number().default(15), // minutes
+  LOGIN_RATE_LIMIT_SIZE: z.coerce.number().default(5), // max attempts
+  SHORT_URL_TOKEN_BUCKET_CAPACITY: z.coerce.number().default(10), // burst capacity
+  SHORT_URL_TOKEN_REFILL_RATE: z.coerce.number().default(1), // tokens refilled
+  SHORT_URL_TOKEN_REFILL_INTERVAL: z.coerce.number().default(2000), // ms (1 token every 2s)
 });
 
 export type Env = z.infer<typeof envSchema>;

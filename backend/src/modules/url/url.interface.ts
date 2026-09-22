@@ -15,4 +15,5 @@ export interface IUrlRepository {
     data: UpdateShortUrlType
   ): Promise<ShortURL | null>;
   deleteShortUrl(shortCode: string): Promise<ShortURL>;
+  findTopHotUrls(limit: number): Promise<ShortURL[]>;
 }

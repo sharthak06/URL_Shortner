@@ -17,10 +17,14 @@ import {
 } from "./cache/cache.service.js";
 import { logger } from "../../config/logger.js";
 import { bloomService } from "../bloom/bloom.container.js";
+import { ILockService } from "../lock/lock.types.js";
 
 export class UrlService {
-  // Dependency Inversion: depends on the interface contract
-  constructor(private readonly urlRepo: IUrlRepository) {}
+  // Dependency Inversion: depends on interface contracts
+  constructor(
+    private readonly urlRepo: IUrlRepository,
+    private readonly lockService: ILockService
+  ) {}
 
   // 1. Create a Short URL with Collision-Safe Retry Loop
   async createShortUrl(
@@ -116,58 +120,101 @@ export class UrlService {
       shortCode,
     });
 
-    // 3. Query Database on Cache Miss
-    const shortUrl = await this.urlRepo.findShortUrlByShortCode(shortCode);
-    if (!shortUrl) {
-      logger.warn({
-        event: "BLOOM_FALSE_POSITIVE",
+   
+    const lock = await this.lockService.acquireLock(shortCode);
+
+    if (!lock.acquired) {
+    
+      logger.info({
+        event: "CACHE_REBUILD_IN_PROGRESS",
         shortCode,
       });
-      throw new AppError("Short URL not found", 404);
+
+      const MAX_POLL_ATTEMPTS = 5;
+      const POLL_INTERVAL_MS = 50;
+
+      for (let attempt = 1; attempt <= MAX_POLL_ATTEMPTS; attempt++) {
+        await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+        const waitedCache = await getUrlCache(cacheKey);
+        if (waitedCache) {
+          logger.info({
+            event: "CACHE_HIT_AFTER_WAIT",
+            shortCode,
+            attempt,
+          });
+          return waitedCache;
+        }
+      }
+
+      
+      logger.warn({
+        event: "CACHE_REBUILD_TIMEOUT_FAILING_OPEN",
+        shortCode,
+      });
+      const fallbackShortUrl = await this.urlRepo.findShortUrlByShortCode(shortCode);
+      if (!fallbackShortUrl) {
+        throw new AppError("Short URL not found", 404);
+      }
+      return {
+        shortUrlId: fallbackShortUrl.id,
+        originalUrl: fallbackShortUrl.originalUrl,
+      };
     }
 
-    const response = {
-      shortUrlId: shortUrl.id,
-      originalUrl: shortUrl.originalUrl,
-    };
+    
+    try {
+      const shortUrl = await this.urlRepo.findShortUrlByShortCode(shortCode);
+      if (!shortUrl) {
+        logger.warn({
+          event: "BLOOM_FALSE_POSITIVE",
+          shortCode,
+        });
+        throw new AppError("Short URL not found", 404);
+      }
 
-    // 4. Populate Redis Cache
-    await setUrlCache(cacheKey, response);
+      const response = {
+        shortUrlId: shortUrl.id,
+        originalUrl: shortUrl.originalUrl,
+      };
 
-    logger.info({
-      event: "CACHE_REBUILT",
-      shortCode,
-    });
+      await setUrlCache(cacheKey, response);
 
-    return response;
+      logger.info({
+        event: "CACHE_REBUILT",
+        shortCode,
+      });
+
+      return response;
+    } finally {
+      if (lock.lockId) {
+        await this.lockService.releaseLock(shortCode, lock.lockId);
+      }
+    }
   }
 
-  // 3. High-Performance Cursor-Based Link Listing (Peek-Ahead Pattern)
   async getUserUrls(
     userId: string,
     limit: number = 10,
     cursor?: string
   ): Promise<PaginatedResponse<ShortURL>> {
-    // Clamp limit between 1 and 100 to prevent database resource exhaustion
+
     const safeLimit = Math.min(Math.max(limit, 1), 100);
 
-    // Decode the base64 cursor token if the client provided one
+    
     const decodedCursor = cursor ? decodeCursor(cursor) : undefined;
 
-    // Fetch safeLimit + 1 rows from repository to peek ahead
+    
     const urls = await this.urlRepo.findShortUrlsByUserId(
       userId,
-      safeLimit + 1, // ✅ Fixed: peek 1 ahead to detect next page
+      safeLimit + 1, 
       decodedCursor
     );
 
-    // If DB returned more than safeLimit, there is at least one more page
     const hasMore = urls.length > safeLimit;
 
-    // Discard the extra peek item from the items returned to the client
+  
     const items = hasMore ? urls.slice(0, safeLimit) : urls;
 
-    // Generate next cursor from the last item of the current page
     const nextCursor =
       hasMore && items.length > 0
         ? encodeCursor({
@@ -183,7 +230,6 @@ export class UrlService {
     };
   }
 
-  // 4. Update Original URL (with Ownership Guard)
   async updateOriginalUrl(
     userId: string,
     shortCode: string,
@@ -195,7 +241,7 @@ export class UrlService {
       throw new AppError("Short URL not found", 404);
     }
 
-    // Authorization Guard: Prevent users from modifying links they don't own
+   
     if (shortUrl.userId !== userId) {
       throw new AppError("You are not allowed to perform this action", 403);
     }
@@ -210,7 +256,6 @@ export class UrlService {
       throw new AppError("Failed to update short URL", 500);
     }
 
-    // Update Redis cache with the new destination URL
     await setUrlCache(getShortUrlCacheKey(updatedShortUrl.shortCode), {
       shortUrlId: updatedShortUrl.id,
       originalUrl: updatedShortUrl.originalUrl,

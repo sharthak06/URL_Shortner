@@ -12,12 +12,23 @@ import {
   getLinkAnalyticsParamsSchema,
   getLinkAnalyticsQuerySchema,
 } from "../analytics/analytics.schema.js";
+import { shortUrlTokenBucketRateLimit } from "../../middlewares/rate-limit/short-url-token-bucket-rate-limit.js";
 
 const urlRouter = Router();
 
+// 1. Create Short URL Endpoint (POST /api/v1/urls/ & POST /api/v1/urls/create-short-url)
 urlRouter.post(
   "/",
   authMiddleware,
+  shortUrlTokenBucketRateLimit,
+  validate(createUrlSchema),
+  urlController.createShortUrl
+);
+
+urlRouter.post(
+  "/create-short-url",
+  authMiddleware,
+  shortUrlTokenBucketRateLimit,
   validate(createUrlSchema),
   urlController.createShortUrl
 );

@@ -68,5 +68,14 @@ export class UrlRepository implements IUrlRepository {
       },
     });
   }
+
+  async findTopHotUrls(limit: number): Promise<ShortURL[]> {
+    return await prisma.shortURL.findMany({
+      orderBy: {
+        clickCount: "desc",
+      },
+      take: limit,
+    });
+  }
 }
   

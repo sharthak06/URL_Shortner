@@ -10,14 +10,20 @@ import analyticsRouter from "./modules/analytics/analytics.route.js";
 import { urlController } from "./modules/url/url.container.js";
 import { globalErrorHandler } from "./middlewares/error.middleware.js";
 import { AppError } from "./utils/Errors/AppError.js";
+import { globalRateLimiter } from "./middlewares/rate-limit/global-rate-limit.middleware.js";
 
 export const app = express();
+
+app.set("trust proxy", 1);
 
 app.use(helmet());
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
+
+// Tier 1: Global Fixed-Window Rate Limiting
+app.use(globalRateLimiter);
 
 
 app.use("/health", healthRouter);

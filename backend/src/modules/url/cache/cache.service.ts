@@ -9,9 +9,10 @@ export interface CachedUrlPayload {
 
 export const setUrlCache = async (
   key: string,
-  data: CachedUrlPayload
+  data: CachedUrlPayload,
+  customTtl?: number
 ): Promise<void> => {
-  const ttl = calculateCacheTTL();
+  const ttl = customTtl !== undefined ? customTtl : calculateCacheTTL();
   await redis.set(key, JSON.stringify(data), "EX", ttl);
 
   logger.debug({
