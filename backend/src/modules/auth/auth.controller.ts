@@ -77,10 +77,13 @@ export class AuthController {
       // req.user will be attached by our auth middleware
       const userId = (req as any).user?.userId as string;
       const user = await this.authService.getLoggedInUser(userId);
+      // Wrap in { user } to match the login/register response shape the
+      // frontend reads (res.data.data.user); returning the user object
+      // directly made getMe resolve to undefined and log the user out on refresh.
       res.status(200).json({
         success: true,
         message: "User profile fetched successfully",
-        data: user,
+        data: { user },
       });
     }
   );
