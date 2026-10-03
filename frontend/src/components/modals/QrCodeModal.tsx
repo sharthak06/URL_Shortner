@@ -1,4 +1,4 @@
-import React, { useLayoutEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import QRCode from "qrcode";
 import {
   Dialog,
@@ -8,7 +8,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Download, Copy, Check } from "lucide-react";
+import { Download, Copy, Check, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 interface QrCodeModalProps {
@@ -24,37 +24,41 @@ export const QrCodeModal: React.FC<QrCodeModalProps> = ({
   shortUrl,
   originalUrl,
 }) => {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [dataUrl, setDataUrl] = useState<string>("");
   const [copied, setCopied] = useState(false);
 
-  useLayoutEffect(() => {
-    if (!isOpen || !canvasRef.current || !shortUrl) return;
+  // Generate the QR as a data URL (not drawn straight to a canvas): an <img>
+  // doesn't depend on the canvas being mounted at the exact moment the effect
+  // runs, so it can't silently render blank when the dialog mounts.
+  useEffect(() => {
+    if (!isOpen || !shortUrl) return;
 
-    // Render high-res QR code on canvas with rounded styling
-    QRCode.toCanvas(
-      canvasRef.current,
-      shortUrl,
-      {
-        width: 256,
-        margin: 2,
-        color: {
-          dark: "#0b0b0c",
-          light: "#ffffff",
-        },
-        errorCorrectionLevel: "H",
+    let cancelled = false;
+    QRCode.toDataURL(shortUrl, {
+      width: 512, // high-res source; displayed at 256 for crisp scaling/download
+      margin: 2,
+      color: {
+        dark: "#0b0b0c",
+        light: "#ffffff",
       },
-      (error) => {
-        if (error) {
-          console.error("QR Code generation error:", error);
-        }
-      }
-    );
+      errorCorrectionLevel: "H",
+    })
+      .then((url) => {
+        if (!cancelled) setDataUrl(url);
+      })
+      .catch((error) => {
+        console.error("QR Code generation error:", error);
+        toast.error("Failed to generate QR code");
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [isOpen, shortUrl]);
 
   const handleDownloadPng = () => {
-    if (!canvasRef.current) return;
+    if (!dataUrl) return;
     try {
-      const dataUrl = canvasRef.current.toDataURL("image/png");
       const link = document.createElement("a");
       link.download = `shortr-qr-${shortUrl.split("/").pop() || "code"}.png`;
       link.href = dataUrl;
@@ -66,23 +70,17 @@ export const QrCodeModal: React.FC<QrCodeModalProps> = ({
   };
 
   const handleCopyImage = async () => {
-    if (!canvasRef.current) return;
+    if (!dataUrl) return;
     try {
-      canvasRef.current.toBlob(async (blob) => {
-        if (!blob) return;
-        try {
-          await navigator.clipboard.write([
-            new ClipboardItem({ "image/png": blob }),
-          ]);
-          setCopied(true);
-          toast.success("QR Code copied to clipboard!");
-          setTimeout(() => setCopied(false), 2000);
-        } catch {
-          toast.error("Clipboard image copy not supported in this browser");
-        }
-      });
+      const blob = await (await fetch(dataUrl)).blob();
+      await navigator.clipboard.write([
+        new ClipboardItem({ "image/png": blob }),
+      ]);
+      setCopied(true);
+      toast.success("QR Code copied to clipboard!");
+      setTimeout(() => setCopied(false), 2000);
     } catch {
-      toast.error("Failed to copy QR code");
+      toast.error("Clipboard image copy not supported in this browser");
     }
   };
 
@@ -100,7 +98,19 @@ export const QrCodeModal: React.FC<QrCodeModalProps> = ({
 
         {/* QR Display Card */}
         <div className="flex flex-col items-center justify-center p-4 my-2 rounded-xl bg-white shadow-inner">
-          <canvas ref={canvasRef} width={256} height={256} className="rounded-lg max-w-full h-auto" />
+          {dataUrl ? (
+            <img
+              src={dataUrl}
+              alt={`QR code for ${shortUrl}`}
+              width={256}
+              height={256}
+              className="rounded-lg max-w-full h-auto"
+            />
+          ) : (
+            <div className="flex h-[256px] w-[256px] items-center justify-center">
+              <Loader2 className="h-8 w-8 animate-spin text-zinc-400" />
+            </div>
+          )}
         </div>
 
         {/* URL Meta details */}
@@ -125,6 +135,7 @@ export const QrCodeModal: React.FC<QrCodeModalProps> = ({
             variant="secondary"
             size="sm"
             onClick={handleCopyImage}
+            disabled={!dataUrl}
             className="gap-1.5 text-xs"
           >
             {copied ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
@@ -134,6 +145,7 @@ export const QrCodeModal: React.FC<QrCodeModalProps> = ({
           <Button
             size="sm"
             onClick={handleDownloadPng}
+            disabled={!dataUrl}
             className="gap-1.5 text-xs"
           >
             <Download className="h-3.5 w-3.5" />
