@@ -18,11 +18,13 @@ services:
     rootDir: backend
     # Build backend (tsc + prisma), push schema to Neon, build the frontend,
     # then copy the SPA build into dist/public so Express can serve it.
+    # --include=dev forces devDependencies (TypeScript, @types/*, Vite, Prisma
+    # CLI) to install even though NODE_ENV=production, since the build needs them.
     buildCommand: >-
-      npm install &&
+      npm install --include=dev &&
       npx prisma db push &&
       npm run build &&
-      cd ../frontend && npm install && npm run build &&
+      cd ../frontend && npm install --include=dev && npm run build &&
       cp -r dist ../backend/dist/public
     startCommand: npm run start
     healthCheckPath: /health
