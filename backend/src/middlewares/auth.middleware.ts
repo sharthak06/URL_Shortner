@@ -1,42 +1,69 @@
 import { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
 import { AppError } from "../utils/Errors/AppError.js";
-import { verifyAccessToken } from "../modules/auth/auth.helper.js";
+import {
+  verifyAccessToken,
+  verifyRefreshToken,
+  signAccessToken,
+  setAccessTokenCookie,
+} from "../modules/auth/auth.helper.js";
 import { JwtPayloadType } from "../modules/auth/auth.types.js";
+import { logger } from "../config/logger.js";
 
 export const authMiddleware = (
   req: Request,
-  _res: Response,
+  res: Response,
   next: NextFunction
 ) => {
   try {
     const authHeader = req.headers.authorization;
+    let accessToken: string | undefined;
 
-    // 1. Check if Authorization header exists
-    if (!authHeader) {
-      return next(new AppError("Authentication required", 401));
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      accessToken = authHeader.split(" ")[1];
+    } else if (req.cookies?.accessToken) {
+      accessToken = req.cookies.accessToken;
     }
 
-    // 2. Must follow "Bearer <token>" convention
-    if (!authHeader.startsWith("Bearer ")) {
-      return next(new AppError("Invalid format for authentication header", 401));
+    if (accessToken) {
+      try {
+        const payload = verifyAccessToken(accessToken) as JwtPayloadType;
+        req.user = {
+          userId: payload.userId,
+        };
+        return next();
+      } catch (err) {
+        // If expired or invalid, fallback to refreshToken if present
+        if (!req.cookies?.refreshToken) {
+          throw err;
+        }
+      }
     }
 
-    const accessToken = authHeader.split(" ")[1];
+    if (req.cookies?.refreshToken) {
+      const refreshPayload = verifyRefreshToken(req.cookies.refreshToken) as JwtPayloadType;
+      req.user = {
+        userId: refreshPayload.userId,
+      };
 
-    if (!accessToken) {
-      return next(new AppError("Access token missing", 401));
+      // Best-effort: mint a fresh access token so the client isn't silently
+      // riding the refresh token for its full lifetime. Never blocks the
+      // request — the user is already authenticated off a valid refresh token.
+      try {
+        const newAccessToken = signAccessToken({ userId: refreshPayload.userId });
+        setAccessTokenCookie(res, newAccessToken);
+      } catch (cookieError) {
+        logger.warn({
+          event: "ACCESS_TOKEN_REFRESH_COOKIE_FAILED",
+          userId: refreshPayload.userId,
+          error: cookieError instanceof Error ? cookieError.message : "Unknown error",
+        });
+      }
+
+      return next();
     }
 
-    // 3. Verify signature and extract payload
-    const payload = verifyAccessToken(accessToken) as JwtPayloadType;
-
-    // 4. Attach user to request for downstream controllers
-    req.user = {
-      userId: payload.userId,
-    };
-
-    next();
+    return next(new AppError("Authentication required", 401));
   } catch (error) {
     if (error instanceof jwt.TokenExpiredError) {
       return next(new AppError("Token expired", 401));

@@ -17,6 +17,7 @@ export const globalErrorHandler = (
     return res.status(statusCode).json({
       status,
       message,
+      errorCode: err.errorCode,
       stack: err.stack,
       error: err,
     });
@@ -27,6 +28,7 @@ export const globalErrorHandler = (
     return res.status(statusCode).json({
       status,
       message,
+      errorCode: err.errorCode,
     });
   }
 

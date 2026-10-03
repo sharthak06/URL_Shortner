@@ -14,6 +14,13 @@
 *.log
 npm-debug.log*
 
+# Temporary & swap files
+*.tmp
+*.tmp.*
+*.swp
+*.swo
+*~
+
 # OS / Editor files
 .DS_Store
 Thumbs.db
@@ -21,3 +28,11 @@ Thumbs.db
 .idea/
 
 .agents/
+
+# AI tooling, agent config & personal/dev docs (not part of the deployable app)
+.claude/
+CLAUDE.md
+AGENTS.md
+PROJECT_STATE.md
+frontend-docs/
+interview-prep/

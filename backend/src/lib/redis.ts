@@ -3,9 +3,10 @@ import { env } from "../config/env.config.js";
 import { logger } from "../config/logger.js";
 import { bloomService } from "../modules/bloom/bloom.container.js";
 
-export const redisConnection = {    
+export const redisConnection = {
   host: env.REDIS_HOST,
   port: env.REDIS_PORT,
+  password: env.REDIS_PASSWORD,
   maxRetriesPerRequest: null,
 };
 

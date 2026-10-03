@@ -14,15 +14,14 @@ export class AuthController {
         email,
         password,
       });
-      // 1. Set the Refresh Token in a secure HTTP-Only cookie
-      setAuthCookies(res, result.refreshToken);
-      // 2. Send the Access Token and sanitized user back in JSON
+      // No session is created here - the account isn't usable until the magic link
+      // (the verification email) is clicked to confirm the email; signing in is a
+      // separate step afterward.
       res.status(201).json({
         success: true,
-        message: "User registered successfully",
+        message: "Check your email to confirm your account, then sign in",
         data: {
           user: result.user,
-          accessToken: result.accessToken,
         },
       });
     }
@@ -35,8 +34,8 @@ export class AuthController {
         email,
         password,
       });
-      // 1. Set the Refresh Token in cookie
-      setAuthCookies(res, result.refreshToken);
+      // 1. Set the Refresh & Access Tokens in cookies
+      setAuthCookies(res, result.refreshToken, result.accessToken);
       // 2. Send the Access Token and user in JSON
       res.status(200).json({
         success: true,
@@ -85,5 +84,62 @@ export class AuthController {
       });
     }
   );
-}
 
+  // The magic link now ONLY verifies the email - no session is created here.
+  verifyEmail = catchAsync(
+    async (req: Request, res: Response, next: NextFunction) => {
+      const { token } = req.body;
+      const result = await this.authService.verifyEmailService(token);
+
+      if (result.alreadyVerified) {
+        return res.status(200).json({
+          success: true,
+          message: "Your email is already verified. Please sign in.",
+          data: { alreadyVerified: true },
+        });
+      }
+
+      res.status(200).json({
+        success: true,
+        message: "Email confirmed. Please sign in.",
+        data: { alreadyVerified: false },
+      });
+    }
+  );
+
+  resendVerification = catchAsync(
+    async (req: Request, res: Response, next: NextFunction) => {
+      const { email } = req.body;
+      await this.authService.resendVerificationService({ email });
+      // Identical response regardless of whether the email exists or is already
+      // verified - prevents account enumeration, same as forgotPassword.
+      res.status(200).json({
+        success: true,
+        message: "If an account needs verification, we've sent a new link.",
+      });
+    }
+  );
+
+  forgotPassword = catchAsync(
+    async (req: Request, res: Response, next: NextFunction) => {
+      const { email } = req.body;
+      await this.authService.forgotPasswordService({ email });
+      // Identical response whether or not the account exists - prevents account enumeration.
+      res.status(200).json({
+        success: true,
+        message: "If an account exists for that email, we've sent a reset link.",
+      });
+    }
+  );
+
+  resetPassword = catchAsync(
+    async (req: Request, res: Response, next: NextFunction) => {
+      const { token, newPassword } = req.body;
+      await this.authService.resetPasswordService({ token, newPassword });
+      res.status(200).json({
+        success: true,
+        message: "Password reset successfully",
+      });
+    }
+  );
+}

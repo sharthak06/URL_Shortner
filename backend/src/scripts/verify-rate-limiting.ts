@@ -49,6 +49,41 @@ class MockRedis {
   async expire(_key: string, _seconds: number): Promise<number> {
     return 1;
   }
+
+  pipeline() {
+    const queue: Array<() => Promise<any>> = [];
+    const pipe = {
+      zremrangebyscore: (key: string, min: number, max: number) => {
+        queue.push(() => this.zremrangebyscore(key, min, max));
+        return pipe;
+      },
+      zcard: (key: string) => {
+        queue.push(() => this.zcard(key));
+        return pipe;
+      },
+      zadd: (key: string, score: number, member: string) => {
+        queue.push(() => this.zadd(key, score, member));
+        return pipe;
+      },
+      expire: (key: string, seconds: number) => {
+        queue.push(() => this.expire(key, seconds));
+        return pipe;
+      },
+      exec: async () => {
+        const results = [];
+        for (const fn of queue) {
+          try {
+            const res = await fn();
+            results.push([null, res]);
+          } catch (err) {
+            results.push([err, null]);
+          }
+        }
+        return results;
+      },
+    };
+    return pipe;
+  }
 }
 
 interface MockResponse {
@@ -256,7 +291,131 @@ async function runMockVerification() {
   );
 
   // --------------------------------------------------------------------------
-  // TEST 3: Verification of Middleware Exports
+  // TEST 3: Email Abuse Rate Limiting (Dual Key: Target Email + Client IP)
+  // --------------------------------------------------------------------------
+  console.log("\n--- Testing Email Abuse Rate Limiter (Email + IP Defense in Depth) ---");
+  const emailLimiterPrefix = "test-email-abuse";
+  const emailWindowMinutes = 15;
+  const emailWindowMs = emailWindowMinutes * 60 * 1000;
+  const emailMaxAttempts = 3;
+
+  async function testEmailAbuseRequest(
+    clientIp: string,
+    rawEmail: unknown,
+    currentTime: number
+  ): Promise<{ allowed: boolean; res: MockResponse; blockedBy?: "email" | "ip" }> {
+    const res = createMockRes();
+    const normalizedEmail =
+      typeof rawEmail === "string" && rawEmail.trim().length > 0
+        ? rawEmail.trim().toLowerCase()
+        : undefined;
+
+    const ipKey = `${emailLimiterPrefix}:${clientIp}`;
+    const emailKey = normalizedEmail ? `${emailLimiterPrefix}:${normalizedEmail}` : null;
+    const windowStart = currentTime - emailWindowMs;
+
+    const checkPipeline = mockRedis.pipeline();
+    if (emailKey) {
+      checkPipeline.zremrangebyscore(emailKey, 0, windowStart);
+      checkPipeline.zcard(emailKey);
+    }
+    checkPipeline.zremrangebyscore(ipKey, 0, windowStart);
+    checkPipeline.zcard(ipKey);
+
+    const results = await checkPipeline.exec();
+    let emailAttempts = 0;
+    let ipAttempts = 0;
+
+    if (emailKey) {
+      emailAttempts = results[1][1] as number;
+      ipAttempts = results[3][1] as number;
+    } else {
+      ipAttempts = results[1][1] as number;
+    }
+
+    if (emailKey && emailAttempts >= emailMaxAttempts) {
+      res.status(429).json({ success: false, message: "Too many email requests." });
+      res.setHeader("Retry-After", Math.ceil(emailWindowMs / 1000));
+      return { allowed: false, res, blockedBy: "email" };
+    }
+
+    if (ipAttempts >= emailMaxAttempts) {
+      res.status(429).json({ success: false, message: "Too many requests from IP." });
+      res.setHeader("Retry-After", Math.ceil(emailWindowMs / 1000));
+      return { allowed: false, res, blockedBy: "ip" };
+    }
+
+    const member = `${currentTime}-${Math.random()}`;
+    const recordPipeline = mockRedis.pipeline();
+    if (emailKey) {
+      recordPipeline.zadd(emailKey, currentTime, member);
+      recordPipeline.expire(emailKey, Math.ceil(emailWindowMs / 1000));
+    }
+    recordPipeline.zadd(ipKey, currentTime, member);
+    recordPipeline.expire(ipKey, Math.ceil(emailWindowMs / 1000));
+    await recordPipeline.exec();
+
+    return { allowed: true, res };
+  }
+
+  // Subtest 3A: Attacker rotating source IPs targeting single victim email (Victim flooding)
+  const victimEmail = "victim@company.com";
+  let victimTime = 7000000;
+
+  const reqIp1 = await testEmailAbuseRequest("10.0.0.1", victimEmail, victimTime);
+  const reqIp2 = await testEmailAbuseRequest("10.0.0.2", "  Victim@Company.COM ", victimTime + 100);
+  const reqIp3 = await testEmailAbuseRequest("10.0.0.3", victimEmail, victimTime + 200);
+
+  assert(
+    reqIp1.allowed && reqIp2.allowed && reqIp3.allowed,
+    "3 requests to victim from 3 different IPs allowed (budget of 3 for email)"
+  );
+
+  // 4th request from brand new IP 10.0.0.4 targeting the same victim email must be blocked!
+  const reqIp4 = await testEmailAbuseRequest("10.0.0.4", victimEmail, victimTime + 300);
+  assert(
+    !reqIp4.allowed && reqIp4.res.statusCode === 429 && reqIp4.blockedBy === "email",
+    "4th request from new IP blocked by EMAIL rate-limit (stops victim inbox flooding via IP rotation)"
+  );
+
+  // Subtest 3B: Attacker on single IP spraying different target emails (Resend quota exhaustion defense)
+  const spammerIp = "172.16.0.99";
+  let spammerTime = 8000000;
+
+  const spray1 = await testEmailAbuseRequest(spammerIp, "user1@example.com", spammerTime);
+  const spray2 = await testEmailAbuseRequest(spammerIp, "user2@example.com", spammerTime + 100);
+  const spray3 = await testEmailAbuseRequest(spammerIp, "user3@example.com", spammerTime + 200);
+
+  assert(
+    spray1.allowed && spray2.allowed && spray3.allowed,
+    "3 spray requests to distinct emails from same IP allowed (budget of 3 for IP)"
+  );
+
+  // 4th request from same IP targeting user4@example.com (fresh email) must be blocked by IP!
+  const spray4 = await testEmailAbuseRequest(spammerIp, "user4@example.com", spammerTime + 300);
+  assert(
+    !spray4.allowed && spray4.res.statusCode === 429 && spray4.blockedBy === "ip",
+    "4th request to fresh email blocked by IP rate-limit (defense in depth against API quota spray)"
+  );
+
+  // Subtest 3C: Defensive fallback when email is missing or invalid
+  const fallbackIp = "192.168.100.1";
+  let fallbackTime = 9000000;
+  const missingEmailReq1 = await testEmailAbuseRequest(fallbackIp, undefined, fallbackTime);
+  const missingEmailReq2 = await testEmailAbuseRequest(fallbackIp, null, fallbackTime + 100);
+  const missingEmailReq3 = await testEmailAbuseRequest(fallbackIp, "", fallbackTime + 200);
+  assert(
+    missingEmailReq1.allowed && missingEmailReq2.allowed && missingEmailReq3.allowed,
+    "Gracefully falls back to IP-only rate limiting when email is missing or empty"
+  );
+  const missingEmailReq4 = await testEmailAbuseRequest(fallbackIp, undefined, fallbackTime + 300);
+  assert(
+    !missingEmailReq4.allowed && missingEmailReq4.blockedBy === "ip",
+    "4th missing-email request from same IP blocked by IP fallback rate limit"
+  );
+
+  // --------------------------------------------------------------------------
+  // TEST 4: Verification of Middleware Exports
   // --------------------------------------------------------------------------
   console.log("\n--- Testing Module Exports & Types ---");
   const { globalRateLimiter } = await import("../middlewares/rate-limit/global-rate-limit.middleware.js");
@@ -264,11 +423,19 @@ async function runMockVerification() {
   const { shortUrlTokenBucketRateLimit, shortUrlTokenBuckerRateLimit } = await import(
     "../middlewares/rate-limit/short-url-token-bucket-rate-limit.js"
   );
+  const {
+    createSlidingWindowRateLimit,
+    forgotPasswordRateLimit,
+    resendVerificationRateLimit,
+  } = await import("../middlewares/rate-limit/email-abuse-sliding-window-rate-limit.js");
 
   assert(typeof globalRateLimiter === "function", "globalRateLimiter middleware is properly exported");
   assert(typeof loginSlidingWindowRateLimit === "function", "loginSlidingWindowRateLimit middleware is properly exported");
   assert(typeof shortUrlTokenBucketRateLimit === "function", "shortUrlTokenBucketRateLimit middleware is properly exported");
   assert(shortUrlTokenBuckerRateLimit === shortUrlTokenBucketRateLimit, "shortUrlTokenBuckerRateLimit alias matches shortUrlTokenBucketRateLimit");
+  assert(typeof createSlidingWindowRateLimit === "function", "createSlidingWindowRateLimit factory is properly exported");
+  assert(typeof forgotPasswordRateLimit === "function", "forgotPasswordRateLimit middleware is properly exported");
+  assert(typeof resendVerificationRateLimit === "function", "resendVerificationRateLimit middleware is properly exported");
 
   // --------------------------------------------------------------------------
   // SUMMARY

@@ -6,6 +6,16 @@ import { analyticsService } from "../modules/analytics/analytics.container.js";
 import { forwardToDeadLetterQueue } from "../queues/deadLetterQueue.js";
 import { logger } from "../config/logger.js";
 import { WorkerConfig } from "./workers.types.js";
+import geoip from "geoip-lite";
+
+const resolveCountry = (ipAddress?: string | null): string | null => {
+  if (!ipAddress) return null;
+  const normalizedIp = ipAddress.startsWith("::ffff:")
+    ? ipAddress.slice(7)
+    : ipAddress;
+  const geo = geoip.lookup(normalizedIp);
+  return geo?.country ?? null;
+};
 
 // Core job processor: consumes job and invokes analytics service data layer
 export const processAnalyticsJob = async (
@@ -21,7 +31,7 @@ export const processAnalyticsJob = async (
     ipAddress,
     userAgent,
     referrer,
-    country,
+    country: country ?? resolveCountry(ipAddress),
     clickedAt: isNaN(parsedDate.getTime()) ? new Date() : parsedDate,
   });
 };

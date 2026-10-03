@@ -94,4 +94,22 @@ export class LockService implements ILockService {
       return false;
     }
   }
+
+  // Whether any holder currently has the lock. Reports false on Redis errors so a
+  // waiter stops waiting and falls back rather than stalling on an unknown state.
+  async isLocked(key: string): Promise<boolean> {
+    const lockKey = getLockKey(key);
+
+    try {
+      return (await redis.exists(lockKey)) === 1;
+    } catch (error) {
+      logger.error({
+        event: "LOCK_CHECK_ERROR",
+        key,
+        lockKey,
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+      return false;
+    }
+  }
 }

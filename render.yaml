@@ -1,0 +1,68 @@
+# Render Blueprint — single free web service that runs the API, serves the
+# built React SPA from the same origin, and (via RUN_WORKER_IN_PROCESS) boots
+# the BullMQ workers in-process.
+#
+# Render free tier has no separate background-worker service, so the worker
+# runs inside the API process. To split it out later (paid plan): set
+# RUN_WORKER_IN_PROCESS=false here and add a second service of type "worker"
+# with startCommand "npm run start:worker".
+#
+# Postgres = Neon (external), Redis = Redis Cloud (external) — both are set
+# via the secret env vars below, not provisioned by Render.
+
+services:
+  - type: web
+    name: url-shortener
+    runtime: node
+    plan: free
+    rootDir: backend
+    # Build backend (tsc + prisma), push schema to Neon, build the frontend,
+    # then copy the SPA build into dist/public so Express can serve it.
+    buildCommand: >-
+      npm install &&
+      npx prisma db push &&
+      npm run build &&
+      cd ../frontend && npm install && npm run build &&
+      cp -r dist ../backend/dist/public
+    startCommand: npm run start
+    healthCheckPath: /health
+    envVars:
+      # --- Runtime mode ---
+      - key: NODE_ENV
+        value: production
+      - key: RUN_WORKER_IN_PROCESS
+        value: "true"
+
+      # --- URL / cache / warmer tuning (non-secret) ---
+      - key: URL_SHORTCODE_LENGTH
+        value: "8"
+      - key: URL_CACHE_TTL
+        value: "300"
+      - key: JITTER_PERCENT
+        value: "0.1"
+      - key: HOT_URL_CACHE_TTL_HOURS
+        value: "24"
+      - key: CACHE_WARMER_EVERY_MINUTES
+        value: "15"
+      - key: WARM_HOT_URLS_LIMIT
+        value: "50"
+
+      # --- Secrets: set these in the Render dashboard (sync:false = not in git) ---
+      - key: DATABASE_URL
+        sync: false
+      - key: ACCESS_TOKEN_SECRET
+        sync: false
+      - key: REFRESH_TOKEN_SECRET
+        sync: false
+      - key: REDIS_HOST
+        sync: false
+      - key: REDIS_PORT
+        sync: false
+      - key: REDIS_PASSWORD
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      # Set to this service's public URL after the first deploy,
+      # e.g. https://url-shortener.onrender.com (used for CORS + email links).
+      - key: FRONTEND_URL
+        sync: false

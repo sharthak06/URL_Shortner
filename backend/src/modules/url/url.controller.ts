@@ -8,7 +8,7 @@ import { addClickToAnalyticsQueue } from "../../queues/analyticsQueue.js";
 export class URLController {
   constructor(private readonly urlService: UrlService) {}
 
-  // 1. Create a new Short URL (POST /api/v1/urls)
+  // 1. Create a new Short URL (POST /api/v1/urls and POST /api/links)
   createShortUrl = catchAsync(
     async (req: Request, res: Response, next: NextFunction) => {
       const userId = req.user?.userId;
@@ -25,7 +25,7 @@ export class URLController {
       return sendResponse(res, 201, {
         success: true,
         message: "Short URL created successfully",
-        data: shortUrl,
+        data: { url: shortUrl, ...shortUrl } as any,
       });
     }
   );
@@ -38,16 +38,34 @@ export class URLController {
         throw new AppError("Authentication required", 401);
       }
 
-      // Defensively parse query params to handle strings/numbers safely
       const limit = req.query.limit ? Number(req.query.limit) : undefined;
       const cursor = req.query.cursor ? String(req.query.cursor) : undefined;
+      const search = req.query.search ? String(req.query.search) : undefined;
 
-      const result = await this.urlService.getUserUrls(userId, limit, cursor);
+      const result = await this.urlService.getUserUrls(userId, limit, cursor, search);
 
       return sendResponse(res, 200, {
         success: true,
         message: "User URLs fetched successfully",
         data: result,
+      });
+    }
+  );
+
+  // 2b. Account-wide Totals for the Dashboard Header (GET /api/v1/urls/stats)
+  getUserUrlStats = catchAsync(
+    async (req: Request, res: Response, next: NextFunction) => {
+      const userId = req.user?.userId;
+      if (!userId) {
+        throw new AppError("Authentication required", 401);
+      }
+
+      const stats = await this.urlService.getUserUrlStats(userId);
+
+      return sendResponse(res, 200, {
+        success: true,
+        message: "User URL stats fetched successfully",
+        data: stats,
       });
     }
   );
@@ -77,7 +95,7 @@ export class URLController {
       return sendResponse(res, 200, {
         success: true,
         message: "Original URL updated successfully",
-        data: updatedShortUrl,
+        data: { url: updatedShortUrl, ...updatedShortUrl } as any,
       });
     }
   );
@@ -94,11 +112,7 @@ export class URLController {
         await this.urlService.getOriginalUrlFromShortCode(shortCode);
 
       // Extract client metadata for asynchronous analytics ingestion
-      const rawForwarded = req.headers["x-forwarded-for"];
-      const ipAddress =
-        (typeof rawForwarded === "string"
-          ? rawForwarded.split(",")[0].trim()
-          : req.socket.remoteAddress) || req.ip || null;
+      const ipAddress = req.ip || null;
 
       const userAgent =
         typeof req.headers["user-agent"] === "string"
@@ -109,16 +123,19 @@ export class URLController {
       const referrer = typeof rawReferrer === "string" ? rawReferrer : null;
 
       // Dispatches click event to BullMQ without blocking redirection UX
-      await addClickToAnalyticsQueue({
-        shortUrlId,
-        ipAddress,
-        userAgent,
-        referrer,
-        clickedAt: new Date().toISOString(),
-      });
+      try {
+        await addClickToAnalyticsQueue({
+          shortUrlId,
+          ipAddress,
+          userAgent,
+          referrer,
+          clickedAt: new Date().toISOString(),
+        });
+      } catch (queueErr) {
+        // Fail-open: Never block redirect if queue is unreachable
+      }
 
-      // Use 302 Found (Temporary Redirect) so browsers don't cache the destination,
-      // ensuring every click hits the server for accurate analytics
+      // 302 Found (Temporary Redirect) so browsers don't cache destination
       return res.redirect(302, originalUrl);
     }
   );

@@ -6,4 +6,5 @@ export interface AcquireLockResult {
 export interface ILockService {
   acquireLock(key: string, ttlSeconds?: number): Promise<AcquireLockResult>;
   releaseLock(key: string, lockId: string): Promise<boolean>;
+  isLocked(key: string): Promise<boolean>;
 }

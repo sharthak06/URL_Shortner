@@ -7,7 +7,7 @@ import {
 } from "./url.helper.js";
 import { IUrlRepository } from "./url.interface.js";
 import { UpdateUrlInputType, UrlInputType } from "./url.schema.js";
-import { PaginatedResponse } from "./url.types.js";
+import { PaginatedResponse, UserUrlStats } from "./url.types.js";
 import { ShortURL } from "@prisma/client";
 import { getShortUrlCacheKey } from "./cache/cache.helper.js";
 import {
@@ -18,6 +18,16 @@ import {
 import { logger } from "../../config/logger.js";
 import { bloomService } from "../bloom/bloom.container.js";
 import { ILockService } from "../lock/lock.types.js";
+import { DEFAULT_LOCK_TTL_SECONDS } from "../lock/lock.constants.js";
+
+// Requests that lose the cache-rebuild lock wait for the holder to fill the cache instead
+// of all querying Postgres at once (the thundering herd the lock exists to prevent). The
+// wait is tied to the lock TTL rather than a fixed small number: a holder on a slow DB can
+// legitimately take most of the TTL, and a shorter wait would just send every waiter to
+// Postgres anyway. It stops just short of the TTL, by which point the holder has either
+// finished or died and the direct Postgres fallback takes over.
+const REBUILD_POLL_INTERVAL_MS = 100;
+const REBUILD_WAIT_BUDGET_MS = DEFAULT_LOCK_TTL_SECONDS * 1000 * 0.8;
 
 export class UrlService {
   // Dependency Inversion: depends on interface contracts
@@ -130,11 +140,15 @@ export class UrlService {
         shortCode,
       });
 
-      const MAX_POLL_ATTEMPTS = 5;
-      const POLL_INTERVAL_MS = 50;
+      const deadline = Date.now() + REBUILD_WAIT_BUDGET_MS;
+      let lockReleased = false;
 
-      for (let attempt = 1; attempt <= MAX_POLL_ATTEMPTS; attempt++) {
-        await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+      for (let attempt = 1; Date.now() < deadline; attempt++) {
+        await new Promise((resolve) => setTimeout(resolve, REBUILD_POLL_INTERVAL_MS));
+
+        // Lock state is read BEFORE the cache: the holder writes the cache and then
+        // releases, so if the lock is already gone here, any cache write has landed.
+        const stillLocked = await this.lockService.isLocked(shortCode);
         const waitedCache = await getUrlCache(cacheKey);
         if (waitedCache) {
           logger.info({
@@ -144,13 +158,26 @@ export class UrlService {
           });
           return waitedCache;
         }
+
+        // Released with no cache entry: the holder found no such URL (deleted link,
+        // Bloom false positive) or its rebuild failed. Nothing more is coming - stop waiting.
+        if (!stillLocked) {
+          lockReleased = true;
+          break;
+        }
       }
 
-      
-      logger.warn({
-        event: "CACHE_REBUILD_TIMEOUT_FAILING_OPEN",
-        shortCode,
-      });
+      if (lockReleased) {
+        logger.info({
+          event: "CACHE_REBUILD_RELEASED_WITHOUT_CACHE",
+          shortCode,
+        });
+      } else {
+        logger.warn({
+          event: "CACHE_REBUILD_TIMEOUT_FAILING_OPEN",
+          shortCode,
+        });
+      }
       const fallbackShortUrl = await this.urlRepo.findShortUrlByShortCode(shortCode);
       if (!fallbackShortUrl) {
         throw new AppError("Short URL not found", 404);
@@ -195,7 +222,8 @@ export class UrlService {
   async getUserUrls(
     userId: string,
     limit: number = 10,
-    cursor?: string
+    cursor?: string,
+    search?: string
   ): Promise<PaginatedResponse<ShortURL>> {
 
     const safeLimit = Math.min(Math.max(limit, 1), 100);
@@ -207,7 +235,8 @@ export class UrlService {
     const urls = await this.urlRepo.findShortUrlsByUserId(
       userId,
       safeLimit + 1, 
-      decodedCursor
+      decodedCursor,
+      search?.trim() || undefined
     );
 
     const hasMore = urls.length > safeLimit;
@@ -228,6 +257,10 @@ export class UrlService {
       nextCursor,
       hasMore,
     };
+  }
+
+  async getUserUrlStats(userId: string): Promise<UserUrlStats> {
+    return this.urlRepo.getUserUrlStats(userId);
   }
 
   async updateOriginalUrl(

@@ -1,5 +1,5 @@
 import { ShortURL } from "@prisma/client";
-import { CreateShortUrlType, UpdateShortUrlType, UrlCursor } from "./url.types.js";
+import { CreateShortUrlType, UpdateShortUrlType, UrlCursor, UserUrlStats } from "./url.types.js";
 
 export interface IUrlRepository {
   createShortUrl(data: CreateShortUrlType): Promise<ShortURL>;
@@ -8,7 +8,8 @@ export interface IUrlRepository {
   findShortUrlsByUserId(
     userId: string,
     limit: number,
-    cursor?: UrlCursor
+    cursor?: UrlCursor,
+    search?: string
   ): Promise<ShortURL[]>;
   updateShortUrl(
     shortCode: string,
@@ -16,4 +17,5 @@ export interface IUrlRepository {
   ): Promise<ShortURL | null>;
   deleteShortUrl(shortCode: string): Promise<ShortURL>;
   findTopHotUrls(limit: number): Promise<ShortURL[]>;
+  getUserUrlStats(userId: string): Promise<UserUrlStats>;
 }

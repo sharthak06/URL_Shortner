@@ -30,7 +30,7 @@ export const createUrlSchema = z
   })
   .strict();
 
-// 2. Update Schema (PATCH /api/v1/urls/:shortCode)
+// 3. Update Schema (PATCH /api/v1/urls/:shortCode)
 export const updateUrlSchema = z
   .object({
     updatedOriginalUrl: z
@@ -50,8 +50,7 @@ export const updateUrlSchema = z
   })
   .strict();
 
- 
-// 3. Cursor Pagination Query Schema (GET /api/v1/urls?limit=10&cursor=...)
+// 4. Cursor Pagination Query Schema (GET /api/v1/urls?limit=10&cursor=...)
 export const getUserUrlsQuerySchema = z
   .object({
     limit: z.coerce
@@ -64,10 +63,16 @@ export const getUserUrlsQuerySchema = z
       .string({ error: "Cursor must be a string" })
       .trim()
       .optional(),
+    // Case-insensitive match against the destination URL or the short code
+    search: z
+      .string({ error: "Search must be a string" })
+      .trim()
+      .max(200, "Search is too long (maximum 200 characters allowed)")
+      .optional(),
   })
   .strict();
 
-// 4. Inferred TypeScript Types
+// 5. Inferred TypeScript Types
 export type UrlInputType = z.infer<typeof createUrlSchema>;
 export type UpdateUrlInputType = z.infer<typeof updateUrlSchema>;
 export type GetUserUrlsQueryType = z.infer<typeof getUserUrlsQuerySchema>;
