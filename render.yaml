@@ -62,7 +62,9 @@ services:
         sync: false
       - key: REDIS_PASSWORD
         sync: false
-      - key: RESEND_API_KEY
+      - key: BREVO_API_KEY
+        sync: false
+      - key: BREVO_SENDER_EMAIL
         sync: false
       # Set to this service's public URL after the first deploy,
       # e.g. https://url-shortener.onrender.com (used for CORS + email links).

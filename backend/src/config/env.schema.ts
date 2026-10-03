@@ -44,8 +44,12 @@ export const envSchema = z.object({
   RESEND_VERIFICATION_RATE_LIMIT_WINDOW: z.coerce.number().default(15), // minutes
   RESEND_VERIFICATION_RATE_LIMIT_SIZE: z.coerce.number().default(3), // max attempts
 
-  // Transactional Email (Resend)
-  RESEND_API_KEY: z.string().min(1, "RESEND_API_KEY is required"),
+  // Transactional Email (Brevo)
+  BREVO_API_KEY: z.string().min(1, "BREVO_API_KEY is required"),
+  // The single sender address verified in the Brevo dashboard. Brevo lets you
+  // verify one email (no domain required) and then send to anyone.
+  BREVO_SENDER_EMAIL: z.string().min(1, "BREVO_SENDER_EMAIL is required"),
+  BREVO_SENDER_NAME: z.string().default("URL Shortener"),
   FRONTEND_URL: z.string().min(1, "FRONTEND_URL is required"),
   EMAIL_VERIFICATION_TOKEN_EXPIRES_IN: z.string().default("24h"),
   PASSWORD_RESET_TOKEN_EXPIRES_IN: z.string().default("30m"),
