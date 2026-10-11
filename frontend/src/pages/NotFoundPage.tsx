@@ -2,6 +2,8 @@ import React, { useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowLeft, Home, LayoutDashboard, Terminal } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
+import { Button } from "@/components/ui/button";
 
 /**
  * Geometric aperture fan motif matching the reference visual
@@ -33,9 +35,10 @@ const ShutterMotif: React.FC<{ orientation?: "top-left" | "top-center" | "bottom
 
 export const NotFoundPage: React.FC = () => {
   const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
 
   useEffect(() => {
-    document.title = "404 - Page Not Found | sho.rt";
+    document.title = "404 - Page Not Found | Shortr";
   }, []);
 
   const handleGoBack = () => {
@@ -54,7 +57,7 @@ export const NotFoundPage: React.FC = () => {
     >
       {/* Ambient background glow */}
       <div
-        className="pointer-events-none absolute -top-40 left-1/2 -z-10 h-96 w-96 -translate-x-1/2 rounded-full bg-emerald-500/5 blur-3xl"
+        className="pointer-events-none absolute -top-40 left-1/2 -z-10 h-96 w-96 -translate-x-1/2 rounded-full bg-brand/5 blur-3xl"
         aria-hidden="true"
       />
 
@@ -67,23 +70,23 @@ export const NotFoundPage: React.FC = () => {
           className="hidden md:grid grid-cols-2 lg:grid-cols-3 gap-2.5 p-4 rounded-2xl border border-line-subtle bg-canvas-subtle/60 backdrop-blur-sm"
           aria-hidden="true"
         >
-          <div className="group flex size-24 lg:size-28 items-start justify-start p-3 rounded-lg border border-line-subtle bg-[#121214] transition-colors hover:border-line">
+          <div className="group flex size-24 lg:size-28 items-start justify-start p-3 rounded-lg border border-line-subtle bg-canvas-subtle transition-colors hover:border-line">
             <ShutterMotif orientation="top-left" />
           </div>
-          <div className="size-24 lg:size-28 rounded-lg border border-line-subtle bg-[#101012]" />
-          <div className="hidden lg:block size-24 lg:size-28 rounded-lg border border-line-subtle bg-[#101012]" />
-          <div className="size-24 lg:size-28 rounded-lg border border-line-subtle bg-[#101012]" />
-          <div className="group flex size-24 lg:size-28 items-end justify-center p-3 rounded-lg border border-line-subtle bg-[#121214] transition-colors hover:border-line">
+          <div className="size-24 lg:size-28 rounded-lg border border-line-subtle bg-canvas" />
+          <div className="hidden lg:block size-24 lg:size-28 rounded-lg border border-line-subtle bg-canvas" />
+          <div className="size-24 lg:size-28 rounded-lg border border-line-subtle bg-canvas" />
+          <div className="group flex size-24 lg:size-28 items-end justify-center p-3 rounded-lg border border-line-subtle bg-canvas-subtle transition-colors hover:border-line">
             <ShutterMotif orientation="bottom-center" />
           </div>
-          <div className="hidden lg:flex group size-24 lg:size-28 items-start justify-center p-3 rounded-lg border border-line-subtle bg-[#121214] transition-colors hover:border-line">
+          <div className="hidden lg:flex group size-24 lg:size-28 items-start justify-center p-3 rounded-lg border border-line-subtle bg-canvas-subtle transition-colors hover:border-line">
             <ShutterMotif orientation="top-center" />
           </div>
-          <div className="group flex size-24 lg:size-28 items-end justify-center p-3 rounded-lg border border-line-subtle bg-[#121214] transition-colors hover:border-line">
+          <div className="group flex size-24 lg:size-28 items-end justify-center p-3 rounded-lg border border-line-subtle bg-canvas-subtle transition-colors hover:border-line">
             <ShutterMotif orientation="bottom-center" />
           </div>
-          <div className="size-24 lg:size-28 rounded-lg border border-line-subtle bg-[#101012]" />
-          <div className="hidden lg:flex group size-24 lg:size-28 items-center justify-center p-3 rounded-lg border border-line-subtle bg-[#121214] transition-colors hover:border-line">
+          <div className="size-24 lg:size-28 rounded-lg border border-line-subtle bg-canvas" />
+          <div className="hidden lg:flex group size-24 lg:size-28 items-center justify-center p-3 rounded-lg border border-line-subtle bg-canvas-subtle transition-colors hover:border-line">
             <ShutterMotif orientation="center" />
           </div>
         </motion.div>
@@ -96,16 +99,16 @@ export const NotFoundPage: React.FC = () => {
           className="flex flex-1 flex-col items-center text-center lg:items-start lg:text-left"
         >
           {/* Status Badge */}
-          <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-emerald-500/25 bg-emerald-950/40 px-3.5 py-1 text-xs font-mono font-medium text-emerald-400 shadow-sm">
-            <Terminal className="size-3.5 text-emerald-400" aria-hidden="true" />
+          <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-brand/25 bg-brand/10 px-3.5 py-1 text-xs font-mono font-medium text-brand-light shadow-sm">
+            <Terminal className="size-3.5 text-brand-light" aria-hidden="true" />
             <span>[ 404: Unknown Route ]</span>
           </div>
 
           {/* 404 Display */}
           <div className="flex items-center font-extrabold tracking-tighter text-white select-none leading-none">
-            <span className="text-8xl sm:text-9xl lg:text-[11rem] leading-none">4</span>
+            <span className="text-7xl sm:text-9xl lg:text-[11rem] leading-none">4</span>
 
-            <div className="relative inline-flex items-center justify-center text-8xl sm:text-9xl lg:text-[11rem] leading-none mx-1">
+            <div className="relative inline-flex items-center justify-center text-7xl sm:text-9xl lg:text-[11rem] leading-none mx-1">
               <span className="opacity-0">0</span>
               <svg
                 className="absolute inset-0 size-full text-white"
@@ -125,7 +128,7 @@ export const NotFoundPage: React.FC = () => {
               </svg>
             </div>
 
-            <span className="text-8xl sm:text-9xl lg:text-[11rem] leading-none">4</span>
+            <span className="text-7xl sm:text-9xl lg:text-[11rem] leading-none">4</span>
           </div>
 
           {/* Heading */}
@@ -144,30 +147,26 @@ export const NotFoundPage: React.FC = () => {
 
           {/* Action Buttons */}
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3.5 sm:justify-start">
-            <Link
-              to="/"
-              className="inline-flex items-center gap-2 rounded-full bg-emerald-500 px-6 py-2.5 text-sm font-semibold text-zinc-950 transition-all hover:bg-emerald-400 hover:shadow-lg hover:shadow-emerald-500/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas active:scale-[0.98]"
-            >
-              <Home className="size-4" aria-hidden="true" />
-              <span>Return Home</span>
-            </Link>
+            <Button asChild size="lg" className="gap-2">
+              <Link to="/">
+                <Home className="size-4" aria-hidden="true" />
+                <span>Return Home</span>
+              </Link>
+            </Button>
 
-            <Link
-              to="/dashboard"
-              className="inline-flex items-center gap-2 rounded-full border border-line bg-[#161618] px-6 py-2.5 text-sm font-medium text-zinc-200 transition-all hover:border-line-strong hover:bg-[#1e1e22] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas active:scale-[0.98]"
-            >
-              <LayoutDashboard className="size-4 text-zinc-400" aria-hidden="true" />
-              <span>Go to Dashboard</span>
-            </Link>
+            {isAuthenticated && (
+              <Button asChild variant="secondary" size="lg" className="gap-2">
+                <Link to="/dashboard">
+                  <LayoutDashboard className="size-4 text-zinc-400" aria-hidden="true" />
+                  <span>Go to Dashboard</span>
+                </Link>
+              </Button>
+            )}
 
-            <button
-              type="button"
-              onClick={handleGoBack}
-              className="inline-flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium text-zinc-400 transition-colors hover:text-zinc-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas rounded-full cursor-pointer"
-            >
+            <Button variant="ghost" size="lg" onClick={handleGoBack} className="gap-1.5">
               <ArrowLeft className="size-4" aria-hidden="true" />
               <span>Go back</span>
-            </button>
+            </Button>
           </div>
         </motion.div>
       </div>

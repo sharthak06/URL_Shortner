@@ -1,7 +1,9 @@
 import React, { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useInView, useReducedMotion } from "framer-motion";
-import { Copy, Globe, Pencil, QrCode, Trash2 } from "lucide-react";
-import { getDomainFaviconUrl } from "@/lib/urlUtils";
+import { BarChart3, Copy, Globe, MoreHorizontal, QrCode } from "lucide-react";
+import { getDomainFaviconUrl, getShortUrlDisplay } from "@/lib/urlUtils";
+import { cn } from "@/lib/utils";
+import { LINK_ROW_GRID } from "@/components/dashboard/LinkRow";
 import { listContainerVariants, sectionRevealVariants, snappyTransition } from "@/lib/motion";
 import { SectionHeader } from "@/components/landing/SectionHeader";
 
@@ -24,19 +26,30 @@ const SAMPLE_LINKS: SampleLink[] = [
 /** How often the first row picks up a new click while the preview is on screen. */
 const TICK_MS = 3200;
 
-const hostnameOf = (url: string) => {
+// Mirrors LinkRow's splitDestination: a host that never truncates + a path that does.
+function splitDestination(originalUrl: string): { host: string; rest: string } {
   try {
-    return new URL(url).hostname.replace(/^www\./, "");
+    const parsed = new URL(originalUrl);
+    const host = parsed.hostname.replace(/^www\./, "");
+    const rest = `${parsed.pathname === "/" ? "" : parsed.pathname}${parsed.search}${parsed.hash}`;
+    return { host, rest };
   } catch {
-    return url;
+    return { host: originalUrl, rest: "" };
   }
-};
+}
+
+const clicksLabel = (n: number) => `${n.toLocaleString("en-US")} ${n === 1 ? "click" : "clicks"}`;
+
+// Static stand-ins for LinkRow's ghost icon buttons: borderless, ICON_BUTTON sizing, hover-revealed.
+const ICON_GHOST = "flex h-9 w-9 items-center justify-center rounded-md text-zinc-400 sm:h-8 sm:w-8";
+const ACTIONS_REVEAL =
+  "[@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 transition-opacity duration-150";
 
 const Favicon: React.FC<{ url: string }> = ({ url }) => {
   const [failed, setFailed] = useState(false);
   const src = getDomainFaviconUrl(url);
   return (
-    <span className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-line bg-surface">
+    <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-line-subtle bg-surface">
       {!failed && src ? (
         <img src={src} alt="" loading="lazy" className="h-4 w-4 object-contain" onError={() => setFailed(true)} />
       ) : (
@@ -46,12 +59,8 @@ const Favicon: React.FC<{ url: string }> = ({ url }) => {
   );
 };
 
-const ROW_GRID =
-  "grid grid-cols-[minmax(0,1fr)_auto] sm:grid-cols-[minmax(0,1.1fr)_minmax(0,1.4fr)_5rem_5.5rem_auto] items-center gap-x-6";
-
 /** A quiet, non-interactive look at the dashboard, placed right after the hero. */
 export const ProductPreview: React.FC = () => {
-  const host = typeof window !== "undefined" ? window.location.host : "shortr.app";
   const frameRef = useRef<HTMLDivElement>(null);
   const inView = useInView(frameRef, { amount: 0.4 });
   const reduceMotion = useReducedMotion();
@@ -104,15 +113,18 @@ export const ProductPreview: React.FC = () => {
               </span>
             </div>
 
-            {/* Column headings */}
+            {/* Column headings (match LinkFeed's own breakpoints) */}
             <div
-              className={`${ROW_GRID} border-b border-line-subtle px-4 py-2.5 font-mono text-[10px] uppercase tracking-[0.14em] text-zinc-400 sm:px-5`}
+              className={cn(
+                LINK_ROW_GRID,
+                "border-b border-line-subtle px-3 py-2.5 font-mono text-[10px] uppercase tracking-[0.14em] text-zinc-400 sm:px-4"
+              )}
             >
               <span>Short link</span>
               <span className="hidden sm:block">Destination</span>
-              <span className="text-right sm:text-left">Clicks</span>
-              <span className="hidden sm:block">Created</span>
-              <span className="hidden sm:block w-[7.75rem]" />
+              <span className="hidden sm:block">Clicks</span>
+              <span className="hidden md:block">Created</span>
+              <span className="hidden w-[6.25rem] sm:block" />
             </div>
 
             {/* Rows */}
@@ -125,36 +137,54 @@ export const ProductPreview: React.FC = () => {
             >
               {SAMPLE_LINKS.map((link, i) => {
                 const clicks = i === 0 ? liveClicks : link.clicks;
+                const dest = splitDestination(link.url);
                 return (
                   <motion.li
                     key={link.code}
                     variants={sectionRevealVariants}
-                    className={`${ROW_GRID} px-4 py-3 sm:px-5`}
+                    className={cn(LINK_ROW_GRID, "group relative px-3 py-3.5 sm:px-4")}
                   >
+                    {/* Short link column: favicon + short link/destination stack */}
                     <div className="flex min-w-0 items-center gap-3">
                       <Favicon url={link.url} />
-                      <div className="min-w-0">
-                        <p className="truncate font-mono text-[13px] font-medium text-indigo-300">
-                          {host}/r/{link.code}
-                        </p>
-                        <p className="truncate font-mono text-[11px] text-zinc-400 sm:hidden">
-                          {hostnameOf(link.url)}
+                      <div className="min-w-0 flex-1">
+                        <span className="block w-fit max-w-full truncate font-mono text-sm font-medium text-indigo-400">
+                          {getShortUrlDisplay(link.code)}
+                        </span>
+                        {/* Phones: destination under the short link */}
+                        <span className="mt-0.5 flex min-w-0 max-w-full text-xs text-zinc-500 sm:hidden">
+                          <bdi dir="ltr" className="flex min-w-0">
+                            <span className="shrink-0 text-zinc-400">{dest.host}</span>
+                            <span className="truncate">{dest.rest}</span>
+                          </bdi>
+                        </span>
+                        {/* Phones: clicks and age move under the destination */}
+                        <p className="mt-1 flex items-center gap-1.5 text-[11px] text-zinc-500 sm:hidden">
+                          <span className="font-mono tabular-nums text-zinc-300">{clicksLabel(clicks)}</span>
+                          <span aria-hidden="true" className="text-zinc-700">·</span>
+                          <span>{link.created}</span>
                         </p>
                       </div>
                     </div>
 
-                    <p className="hidden min-w-0 truncate font-mono text-xs text-zinc-400 sm:block">
-                      {link.url.replace(/^https?:\/\/(www\.)?/, "")}
-                    </p>
+                    {/* Destination column (tablet and up) */}
+                    <span className="hidden min-w-0 max-w-full text-xs text-zinc-500 sm:flex">
+                      <bdi dir="ltr" className="flex min-w-0">
+                        <span className="shrink-0 text-zinc-400">{dest.host}</span>
+                        <span className="truncate">{dest.rest}</span>
+                      </bdi>
+                    </span>
 
-                    <div className="flex items-center justify-end gap-1.5 sm:justify-start">
+                    {/* Clicks column (tablet and up) */}
+                    <div className="hidden items-center gap-1 whitespace-nowrap rounded-md px-2 py-1 text-xs text-zinc-300 sm:flex">
                       {i === 0 && !reduceMotion && (
                         <span className="relative flex h-1.5 w-1.5">
                           <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-indigo-400 opacity-60" />
                           <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-indigo-400" />
                         </span>
                       )}
-                      <span className="relative inline-flex overflow-hidden font-mono text-[13px] tabular-nums text-zinc-200">
+                      <BarChart3 className="h-3.5 w-3.5 opacity-70" />
+                      <span className="relative inline-flex overflow-hidden font-mono tabular-nums">
                         <AnimatePresence mode="popLayout" initial={false}>
                           <motion.span
                             key={clicks}
@@ -163,23 +193,26 @@ export const ProductPreview: React.FC = () => {
                             exit={{ y: -10, opacity: 0 }}
                             transition={snappyTransition}
                           >
-                            {clicks.toLocaleString("en-US")}
+                            {clicksLabel(clicks)}
                           </motion.span>
                         </AnimatePresence>
                       </span>
                     </div>
 
-                    <p className="hidden font-mono text-xs text-zinc-500 sm:block">{link.created}</p>
+                    {/* Age column (desktop) */}
+                    <span className="hidden text-right text-xs text-zinc-500 md:block">{link.created}</span>
 
-                    <div className="hidden items-center gap-1 text-zinc-500 sm:flex">
-                      {[Copy, QrCode, Pencil, Trash2].map((Icon, j) => (
-                        <span
-                          key={j}
-                          className="flex h-7 w-7 items-center justify-center rounded-md border border-line-subtle bg-surface/60"
-                        >
-                          <Icon className="h-3.5 w-3.5" strokeWidth={1.75} />
-                        </span>
-                      ))}
+                    {/* Actions: borderless ghost icons, revealed on row hover */}
+                    <div className={cn("hidden shrink-0 items-center gap-0.5 sm:flex", ACTIONS_REVEAL)}>
+                      <span className={ICON_GHOST}>
+                        <Copy className="h-3.5 w-3.5" aria-hidden="true" />
+                      </span>
+                      <span className={ICON_GHOST}>
+                        <QrCode className="h-3.5 w-3.5" aria-hidden="true" />
+                      </span>
+                      <span className={ICON_GHOST}>
+                        <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
+                      </span>
                     </div>
                   </motion.li>
                 );
