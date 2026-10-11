@@ -112,7 +112,9 @@ export const AuthShell: React.FC<AuthShellProps> = ({ backLink, children }) => {
         onPointerMove={handlePointerMove}
         onPointerEnter={handlePointerEnter}
         onPointerLeave={handlePointerLeave}
-        className="relative isolate flex min-h-[calc(100dvh-3.5rem)] flex-col items-center justify-center overflow-hidden bg-canvas px-4 py-16"
+        // flex-1 fills the <main> area so centering accounts for the Navbar AND Footer
+        // automatically, at any viewport — no hardcoded chrome height to drift.
+        className="relative isolate flex flex-1 flex-col items-center justify-center overflow-hidden bg-canvas px-4 py-16"
       >
         {/* Static backdrop: a dot grid that fades out from the card, and one soft light from above */}
         <div
@@ -267,9 +269,21 @@ interface AuthFieldProps extends InputProps {
 }
 
 /** Password fields automatically get a show/hide toggle inside the input. */
-export const AuthField: React.FC<AuthFieldProps> = ({ id, label, action, hint, className, type, ...inputProps }) => {
+export const AuthField: React.FC<AuthFieldProps> = ({
+  id,
+  label,
+  action,
+  hint,
+  className,
+  type,
+  "aria-describedby": ariaDescribedBy,
+  ...inputProps
+}) => {
   const [isRevealed, setIsRevealed] = useState(false);
   const isPassword = type === "password";
+  const hintId = hint ? `${id}-hint` : undefined;
+  // Associate the hint (and any caller-supplied error id) with the input for screen readers.
+  const describedBy = [ariaDescribedBy, hintId].filter(Boolean).join(" ") || undefined;
 
   return (
     <div className="group/field space-y-2 text-left">
@@ -286,6 +300,7 @@ export const AuthField: React.FC<AuthFieldProps> = ({ id, label, action, hint, c
         <Input
           id={id}
           type={isPassword && isRevealed ? "text" : type}
+          aria-describedby={describedBy}
           className={cn(
             "h-11 bg-surface/60 border-line-subtle text-sm placeholder:text-zinc-600",
             "shadow-[inset_0_1px_2px_rgba(0,0,0,0.25)] transition-[border-color,background-color,box-shadow] duration-200",
@@ -322,7 +337,7 @@ export const AuthField: React.FC<AuthFieldProps> = ({ id, label, action, hint, c
           </button>
         )}
       </div>
-      {hint && <p className="text-xs text-zinc-500">{hint}</p>}
+      {hint && <p id={hintId} className="text-xs text-zinc-500">{hint}</p>}
     </div>
   );
 };

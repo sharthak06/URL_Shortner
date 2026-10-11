@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { authApi } from "@/api/auth.api";
@@ -40,7 +40,6 @@ export const ResetPasswordPage: React.FC = () => {
       await authApi.resetPassword({ token, newPassword: newPassword.trim() });
       setIsSuccess(true);
       toast.success("Password reset successfully. Please sign in.");
-      setTimeout(() => navigate("/login", { replace: true }), 2000);
     } catch (err: any) {
       const message =
         err?.response?.data?.message || "This reset link is invalid or has expired.";
@@ -50,6 +49,14 @@ export const ResetPasswordPage: React.FC = () => {
       setIsSubmitting(false);
     }
   };
+
+  // Auto-continue to login shortly after a successful reset; cleared on unmount
+  // so we never navigate after the component is gone.
+  useEffect(() => {
+    if (!isSuccess) return;
+    const timer = setTimeout(() => navigate("/login", { replace: true }), 2000);
+    return () => clearTimeout(timer);
+  }, [isSuccess, navigate]);
 
   const state = !token ? "missingToken" : isSuccess ? "success" : "form";
 
@@ -100,6 +107,7 @@ export const ResetPasswordPage: React.FC = () => {
           >
             <AuthField
               id="reset-password"
+              name="password"
               label="New Password"
               type="password"
               autoComplete="new-password"

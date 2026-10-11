@@ -24,20 +24,29 @@ export const ForgotPasswordPage: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email.trim()) return;
-
+  // Backend returns an identical response whether or not the account exists, so the
+  // error path here can only surface rate-limit/validation/5xx text - never existence.
+  const sendResetLink = async (): Promise<boolean> => {
     setIsSubmitting(true);
     try {
       await authApi.forgotPassword({ email: email.trim() });
-      setIsSubmitted(true);
+      return true;
     } catch (err: any) {
-      const message = err?.response?.data?.message || "Something went wrong. Please try again.";
-      toast.error(message);
+      toast.error(err?.response?.data?.message || "Something went wrong. Please try again.");
+      return false;
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email.trim()) return;
+    if (await sendResetLink()) setIsSubmitted(true);
+  };
+
+  const handleResend = async () => {
+    if (await sendResetLink()) toast.success("Sent again — check your inbox.");
   };
 
   return (
@@ -60,9 +69,21 @@ export const ForgotPasswordPage: React.FC = () => {
               link. It expires shortly, so use it soon.
             </AuthMessage>
             <AuthActions>
-              <Button asChild variant="secondary" className={authSecondaryButtonClass}>
-                <Link to="/login">Back to Sign In</Link>
+              <Button
+                type="button"
+                variant="secondary"
+                className={authSecondaryButtonClass}
+                onClick={handleResend}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? "Sending…" : "Resend link"}
               </Button>
+              <p className="text-[13px] text-zinc-400">
+                Wrong email?{" "}
+                <button type="button" onClick={() => setIsSubmitted(false)} className={authLinkClass}>
+                  Use a different one
+                </button>
+              </p>
             </AuthActions>
           </motion.div>
         ) : (
@@ -77,6 +98,7 @@ export const ForgotPasswordPage: React.FC = () => {
           >
             <AuthField
               id="forgot-email"
+              name="email"
               label="Email"
               type="email"
               autoComplete="email"

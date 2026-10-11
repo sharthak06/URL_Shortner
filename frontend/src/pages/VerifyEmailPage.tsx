@@ -48,7 +48,9 @@ export const VerifyEmailPage: React.FC = () => {
   const navigate = useNavigate();
   const token = searchParams.get("token") || "";
   const [status, setStatus] = useState<VerifyStatus>(token ? "verifying" : "error");
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(
+    token ? null : "This verification link is missing or invalid."
+  );
 
   useEffect(() => {
     if (!token || processedTokens.has(token)) return;
@@ -96,6 +98,13 @@ export const VerifyEmailPage: React.FC = () => {
   return (
     <AuthShell>
       <AuthHeader title={title} status={headerStatus} />
+
+      {/* Stable (never unmounted) sr-only live region so SR users hear the outcome
+          when status resolves - the visible block below is swapped by AnimatePresence
+          and would not announce reliably. */}
+      <div className="sr-only" role="status">
+        {status === "error" ? `${title}. ${errorMessage ?? ""}` : title}
+      </div>
 
       <AnimatePresence mode="wait" initial={false}>
         <motion.div key={status} variants={authSwapVariants} initial="hidden" animate="visible" exit="exit">

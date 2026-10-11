@@ -46,7 +46,9 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialMode }) => {
   const location = useLocation();
   const { user, isAuthenticated, login, register } = useAuth();
 
-  const queryMode = searchParams.get("mode") === "login" ? "login" : "register";
+  // Neutral /auth (no mode param, no initialMode) defaults to login, like most apps.
+  // /signup still passes initialMode="register" and ?mode=register still selects register.
+  const queryMode = searchParams.get("mode") === "register" ? "register" : "login";
   const [mode, setMode] = useState<AuthMode>(initialMode || queryMode);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -105,13 +107,20 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialMode }) => {
     setSearchParams({ mode: newMode }, { replace: true });
   };
 
-  const isSubmitDisabled = isSubmitting || !email.trim() || !password.trim();
+  // Register enforces the same >= 6 rule as reset; login stays non-empty-only so existing
+  // accounts with shorter passwords can still sign in.
+  const isSubmitDisabled =
+    isSubmitting ||
+    !email.trim() ||
+    !password.trim() ||
+    (mode === "register" && password.trim().length < 6);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmedEmail = email.trim();
     const trimmedPassword = password.trim();
     if (!trimmedEmail || !trimmedPassword) return;
+    if (mode === "register" && trimmedPassword.length < 6) return;
 
     setIsSubmitting(true);
     try {
@@ -229,6 +238,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialMode }) => {
             <form onSubmit={handleSubmit} className="space-y-5">
               <AuthField
                 id="auth-email"
+                name="email"
                 label="Email"
                 type="email"
                 autoComplete="email"
@@ -240,6 +250,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialMode }) => {
 
               <AuthField
                 id="auth-password"
+                name="password"
                 label="Password"
                 type="password"
                 autoComplete={mode === "login" ? "current-password" : "new-password"}
@@ -247,6 +258,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialMode }) => {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                minLength={mode === "register" ? 6 : undefined}
+                hint={mode === "register" ? "At least 6 characters." : undefined}
                 action={
                   <AnimatePresence initial={false}>
                     {mode === "login" && (
