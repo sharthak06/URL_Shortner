@@ -4,6 +4,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { AuthProvider } from "@/context/AuthContext";
 import { Toaster } from "sonner";
+import { CheckCircle2, XCircle, AlertTriangle, Info } from "lucide-react";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { RouteLoadingFallback } from "@/components/layout/RouteLoadingFallback";
@@ -21,12 +22,12 @@ const NotFoundPage = lazy(() => import("@/pages/NotFoundPage"));
 export const App: React.FC = () => {
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <BrowserRouter>
+      <BrowserRouter>
+        <AuthProvider>
           <div className="flex min-h-dvh flex-col bg-canvas text-zinc-100">
             <Navbar />
 
-            <main className="flex flex-1 flex-col">
+            <main id="main" tabIndex={-1} className="flex flex-1 flex-col focus:outline-none">
               <Suspense fallback={<RouteLoadingFallback />}>
                 <Routes>
                   <Route path="/" element={<LandingPage />} />
@@ -46,21 +47,34 @@ export const App: React.FC = () => {
             <Footer />
 
             <Toaster
-              position="bottom-right"
+              position="top-center"
               theme="dark"
-              richColors
-              closeButton
+              gap={8}
+              offset={16}
+              visibleToasts={3}
+              // Neutral surface for every toast; semantics carried only by a small
+              // colored leading icon (status color = small semantic cue, not a fill).
+              icons={{
+                success: <CheckCircle2 className="h-[18px] w-[18px] text-emerald-400" aria-hidden="true" />,
+                error: <XCircle className="h-[18px] w-[18px] text-red-400" aria-hidden="true" />,
+                warning: <AlertTriangle className="h-[18px] w-[18px] text-amber-400" aria-hidden="true" />,
+                info: <Info className="h-[18px] w-[18px] text-indigo-400" aria-hidden="true" />,
+              }}
               toastOptions={{
-                style: {
-                  background: "#161618",
-                  borderColor: "rgba(255, 255, 255, 0.1)",
-                  color: "#f4f4f5",
+                duration: 4000,
+                classNames: {
+                  toast:
+                    "!bg-surface !border !border-line !rounded-xl !shadow-lg !font-sans !text-zinc-100",
+                  title: "!font-medium",
+                  description: "!text-zinc-400",
+                  actionButton: "!bg-brand !text-white",
+                  cancelButton: "!bg-surface-hover !text-zinc-300",
                 },
               }}
             />
           </div>
-        </BrowserRouter>
-      </AuthProvider>
+        </AuthProvider>
+      </BrowserRouter>
     </QueryClientProvider>
   );
 };

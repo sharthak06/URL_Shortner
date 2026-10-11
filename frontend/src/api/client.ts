@@ -7,6 +7,8 @@ interface CustomRequestConfig extends InternalAxiosRequestConfig {
 export const apiClient = axios.create({
   baseURL: import.meta.env.VITE_API_URL || "/api/v1",
   withCredentials: true,
+  timeout: 15000, // a hung /auth/refresh must reject so the failedQueue drains instead of pending forever
+
   headers: {
     "Content-Type": "application/json",
   },

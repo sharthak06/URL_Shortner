@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { authApi } from "../api/auth.api";
 import type { LoginPayload, RegisterPayload, User } from "../types/auth.types";
@@ -25,6 +26,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Query keys ("user-urls", "url-analytics", ...) aren't scoped by userId, so the cache
   // is wiped on every session change to keep one account's data from showing in another's.
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   // Synchronize ref with user state so event listeners always access active session status
   useEffect(() => {
@@ -49,11 +51,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const handleSessionExpired = () => {
       // Only display the error toast if the user was actively authenticated previously
       // and their session was terminated mid-use. Cold-start visitors should never see an error.
-      if (userRef.current) {
+      const wasAuthenticated = !!userRef.current;
+      if (wasAuthenticated) {
         toast.error("Session expired. Please log in again.");
       }
       queryClient.clear();
       setUser(null);
+      // Single source of truth for the expired-session redirect: send them where the toast
+      // promises (/login). Navigating before the re-render means a protected page's own
+      // <Navigate to="/"> never fires. Logout / direct unauth access keep their landing redirect.
+      if (wasAuthenticated) {
+        navigate("/login", { replace: true });
+      }
     };
 
     window.addEventListener("auth:session-expired", handleSessionExpired);
