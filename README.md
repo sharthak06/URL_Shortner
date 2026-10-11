@@ -35,7 +35,6 @@
   - [Authentication & Verification](#authentication--verification)
 - [Folder Structure](#-folder-structure)
 - [Deployment](#-deployment)
-- [Contributing](#-contributing)
 - [License](#-license)
 
 ---
@@ -642,27 +641,6 @@ The repository includes a production-ready `render.yaml` blueprint designed for 
 - **Single Service Mode:** The build script compiles TypeScript, executes `npx prisma db push` to synchronize schemas with your cloud PostgreSQL (Neon), builds the React SPA with Vite, and copies the frontend bundle to `backend/dist/public` where Express serves it statically from the same domain.
 - **In-Process Workers:** By setting `RUN_WORKER_IN_PROCESS="true"`, the BullMQ ingestion workers and cache warmer run inside the main Node.js process without requiring a paid second service on cloud free tiers.
 - **External Stores:** Easily point your `DATABASE_URL` to [Neon](https://neon.tech/) and your Redis configuration to [Redis Cloud](https://redis.com/try-free/).
-
----
-
-## 🤝 Contributing
-
-Contributions, issues, and feature requests are welcome!
-
-1. Fork the Project.
-2. Create your Feature Branch:
-   ```bash
-   git commit -b feature/AmazingFeature
-   ```
-3. Commit your Changes:
-   ```bash
-   git commit -m "feat: add AmazingFeature"
-   ```
-4. Push to the Branch:
-   ```bash
-   git push origin feature/AmazingFeature
-   ```
-5. Open a Pull Request.
 
 ---
 
