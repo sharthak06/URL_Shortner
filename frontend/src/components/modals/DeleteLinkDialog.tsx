@@ -64,7 +64,7 @@ export const DeleteLinkDialog: React.FC<DeleteLinkDialogProps> = ({
           </AlertDialogTitle>
           <AlertDialogDescription className="text-xs text-zinc-400 leading-relaxed">
             This action is permanent and cannot be undone. Any QR codes, printed materials, or visitors navigating to{" "}
-            <span className="font-mono text-zinc-200">{getShortUrlDisplay(url.shortCode)}</span> will receive an immediate HTTP 404 Not Found error.
+            <span className="font-mono text-zinc-200">{getShortUrlDisplay(url.shortCode)}</span> will land on a "not found" page.
           </AlertDialogDescription>
         </AlertDialogHeader>
 

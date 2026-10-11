@@ -7,8 +7,10 @@ import { getShortUrlDisplay } from "@/lib/urlUtils";
 import { listContainerVariants, sectionRevealVariants } from "@/lib/motion";
 import { cn, formatCount } from "@/lib/utils";
 
-const TILE =
-  "relative flex min-h-[104px] flex-col justify-between gap-3 rounded-xl border border-line-subtle bg-card p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]";
+// Airy inline stats: no per-tile box. A hairline divider (border-l) on stats
+// 2–3 at sm+ separates them; on mobile whitespace does the work.
+const STAT = "flex flex-col gap-2";
+const DIVIDER = "sm:border-l sm:border-line-subtle sm:pl-6";
 
 interface TileLabelProps {
   icon: React.ReactNode;
@@ -47,27 +49,24 @@ export const StatsStrip: React.FC = () => {
       variants={listContainerVariants}
       initial="hidden"
       animate="visible"
-      className="grid w-full grid-cols-2 gap-3 sm:grid-cols-3"
+      className="grid w-full grid-cols-2 gap-x-6 gap-y-8 sm:grid-cols-3 sm:gap-x-8"
     >
-      <motion.div variants={sectionRevealVariants} className={TILE}>
+      <motion.div variants={sectionRevealVariants} className={STAT}>
         <TileLabel icon={<Link2 aria-hidden="true" />}>Links</TileLabel>
         {renderCount(stats?.totalLinks)}
       </motion.div>
 
-      <motion.div variants={sectionRevealVariants} className={TILE}>
+      <motion.div variants={sectionRevealVariants} className={cn(STAT, DIVIDER)}>
         <TileLabel icon={<MousePointerClick aria-hidden="true" />}>Total clicks</TileLabel>
         {renderCount(stats?.totalClicks)}
       </motion.div>
 
       {/* Full width on phones: a short link needs the room more than a number does */}
-      <motion.div variants={sectionRevealVariants} className="col-span-2 sm:col-span-1">
+      <motion.div variants={sectionRevealVariants} className={cn("col-span-2 sm:col-span-1", DIVIDER)}>
         {topLink ? (
           <Link
             to={`/analytics/${topLink.shortCode}`}
-            className={cn(
-              TILE,
-              "group h-full transition-[border-color,background-color] duration-200 hover:border-line hover:bg-card-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/60"
-            )}
+            className="group -mx-2 flex flex-col gap-2 rounded-lg px-2 py-1 transition-colors duration-200 hover:bg-white/[0.02] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/60"
           >
             <div className="flex items-center justify-between">
               <TileLabel icon={<Trophy aria-hidden="true" />}>Top link</TileLabel>
@@ -77,7 +76,7 @@ export const StatsStrip: React.FC = () => {
               />
             </div>
             <div className="min-w-0">
-              <p className="truncate font-mono text-sm font-medium text-indigo-400" title={getShortUrlDisplay(topLink.shortCode)}>
+              <p className="truncate font-mono text-sm font-medium text-indigo-400 transition-colors group-hover:text-indigo-300" title={getShortUrlDisplay(topLink.shortCode)}>
                 {getShortUrlDisplay(topLink.shortCode)}
               </p>
               <p className="mt-0.5 text-xs text-zinc-500">
@@ -87,7 +86,7 @@ export const StatsStrip: React.FC = () => {
             </div>
           </Link>
         ) : (
-          <div className={cn(TILE, "h-full")}>
+          <div className={STAT}>
             <TileLabel icon={<Trophy aria-hidden="true" />}>Top link</TileLabel>
             {isLoading ? (
               <ValueSkeleton className="w-full max-w-[180px]" />

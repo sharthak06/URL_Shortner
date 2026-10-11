@@ -47,7 +47,7 @@ export const DashboardShortener: React.FC<DashboardShortenerProps> = ({
       setRateLimitCountdown((prev) => {
         const next = Math.max(0, Number((prev - 0.1).toFixed(1)));
         if (next === 0) {
-          setSrAnnouncement("Tokens replenished. Ready to shorten links.");
+          setSrAnnouncement("Ready — you can create links again.");
         }
         return next;
       });
@@ -59,8 +59,8 @@ export const DashboardShortener: React.FC<DashboardShortenerProps> = ({
   const fireMiniConfetti = () => {
     try {
       confetti({
-        particleCount: 40,
-        spread: 50,
+        particleCount: 24,
+        spread: 40,
         origin: { y: 0.6 },
         colors: ["#818cf8", "#4f46e5", "#10b981"],
       });
@@ -75,7 +75,7 @@ export const DashboardShortener: React.FC<DashboardShortenerProps> = ({
       setErrorMessage(null);
       setNeedsVerification(false);
       fireMiniConfetti();
-      toast.success(`Shortlink created! ${getShortUrlDisplay(newUrl.shortCode)}`);
+      toast.success(`Short link created! ${getShortUrlDisplay(newUrl.shortCode)}`);
       onUrlCreated?.(newUrl);
     },
     onError: (err: any) => {
@@ -96,9 +96,9 @@ export const DashboardShortener: React.FC<DashboardShortenerProps> = ({
           : 2.0;
 
         setRateLimitCountdown(waitSeconds);
-        setSrAnnouncement(`Burst rate limit reached. Token refilling in ${Math.ceil(waitSeconds)} seconds.`);
+        setSrAnnouncement(`You can create another link in ${Math.ceil(waitSeconds)} seconds.`);
         toast.warning(
-          `Whoa, speed demon! 10 tokens used. Refilling in ${waitSeconds.toFixed(1)}s...`,
+          `Slow down a sec — you can create another link in ${Math.ceil(waitSeconds)}s.`,
           {
             duration: Math.ceil(waitSeconds * 1000),
           }
@@ -175,7 +175,7 @@ export const DashboardShortener: React.FC<DashboardShortenerProps> = ({
             }}
             placeholder="Paste a long destination URL to shorten..."
             disabled={isPending || isRateLimited}
-            className="w-full bg-transparent text-sm sm:text-base text-zinc-100 placeholder:text-zinc-500 focus:outline-none font-mono disabled:opacity-50"
+            className="w-full bg-transparent text-sm sm:text-base text-zinc-100 placeholder:text-zinc-500 focus:outline-none disabled:opacity-50"
             aria-label="Destination URL"
             autoComplete="off"
             spellCheck={false}
@@ -214,7 +214,7 @@ export const DashboardShortener: React.FC<DashboardShortenerProps> = ({
           ) : isRateLimited ? (
             <>
               <Hourglass className="h-4 w-4 animate-spin" />
-              <span className="font-mono">Refilling in {rateLimitCountdown.toFixed(1)}s...</span>
+              <span>Try again in <span className="font-mono">{Math.ceil(rateLimitCountdown)}</span>s</span>
             </>
           ) : (
             <>

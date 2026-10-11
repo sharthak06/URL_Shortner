@@ -1,15 +1,10 @@
 import React, { useState, useMemo } from "react";
 import { useParams, Link, Navigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { urlsApi } from "@/api/urls.api";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
   ArrowLeft,
-  Flame,
-  Globe,
-  Compass,
-  Smartphone,
   Copy,
   Check,
   RefreshCw,
@@ -18,8 +13,9 @@ import {
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { cardEntranceVariants } from "@/lib/motion";
+import { formatCount } from "@/lib/utils";
 import { getShortUrl, getShortUrlDisplay } from "@/lib/urlUtils";
-import { classifyDevice } from "@/lib/analyticsUtils";
+import { classifyDevice, getCountryName } from "@/lib/analyticsUtils";
 import { useAuth } from "@/context/AuthContext";
 import { ClickTimelineChart } from "@/components/analytics/ClickTimelineChart";
 import { GeographicBreakdown } from "@/components/analytics/GeographicBreakdown";
@@ -30,14 +26,20 @@ import { RecentClicksStream } from "@/components/analytics/RecentClicksStream";
 // charted from their most recent CLICK_SAMPLE_LIMIT events.
 const CLICK_SAMPLE_LIMIT = 100;
 
+// Airy stat tiles: no box, no border, no bg — whitespace separates them.
+// min-h + justify-between keeps the four numbers baseline-aligned across the row.
 const TILE =
-  "relative flex min-h-[104px] flex-col justify-between gap-3 rounded-xl border border-line-subtle bg-card p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]";
+  "relative flex min-h-[104px] flex-col justify-between gap-2";
+
+// Matches the breakdown/stream card frame so skeletons occupy the real footprint.
+const CARD_SKELETON =
+  "rounded-xl border border-line-subtle bg-card p-5 sm:p-6 w-full space-y-4 animate-pulse";
 
 export const AnalyticsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const [copied, setCopied] = useState(false);
 
-  // 15-second background polling interval for real-time telemetry updates
+  // 15-second background polling so the analytics stay up to date
   const {
     data: analytics,
     isLoading,
@@ -48,6 +50,9 @@ export const AnalyticsPage: React.FC = () => {
     queryFn: () => urlsApi.getUrlAnalytics(id!, { limit: CLICK_SAMPLE_LIMIT }),
     enabled: !!id,
     refetchInterval: 15000,
+    // Keep the last payload on screen during the 15s background poll so the sections
+    // don't remount into empty states and layout-shift back on every refetch.
+    placeholderData: keepPreviousData,
   });
 
   const { isAuthenticated, isLoading: authLoading } = useAuth();
@@ -80,13 +85,13 @@ export const AnalyticsPage: React.FC = () => {
   const topCountry = analytics?.topCountries?.[0];
   const topReferrer = analytics?.topReferrers?.[0];
 
-  // If session is still hydrating from GET /auth/me, display clean skeleton loader
+  // While the auth session loads from GET /auth/me, show a clean skeleton loader
   if (authLoading) {
     return (
       <div className="flex flex-1 items-center justify-center p-8">
-        <div className="flex items-center gap-2 text-sm text-zinc-400 font-mono">
+        <div className="flex items-center gap-2 text-sm text-zinc-400">
           <span className="h-2 w-2 rounded-full bg-indigo-500 animate-ping" />
-          <span>Hydrating session...</span>
+          <span>Loading…</span>
         </div>
       </div>
     );
@@ -99,24 +104,28 @@ export const AnalyticsPage: React.FC = () => {
 
   return (
     <div className="flex flex-1 flex-col items-center justify-start px-4 py-8 sm:py-10 max-w-5xl mx-auto w-full space-y-6">
-      {/* Top Navigation & Telemetry State Header */}
+      {/* Top navigation + live status */}
       <div className="w-full flex items-center justify-between">
         <Link
           to="/dashboard"
-          className="inline-flex items-center gap-1.5 text-xs font-mono text-zinc-400 hover:text-zinc-100 transition-colors"
+          className="inline-flex items-center gap-1.5 text-xs text-zinc-400 hover:text-zinc-100 transition-colors"
         >
           <ArrowLeft className="h-3.5 w-3.5" />
           <span>Back to Dashboard</span>
         </Link>
 
         <div className="flex items-center gap-2">
-          <span className="text-xs font-mono text-zinc-500">Updates automatically</span>
+          <span className="inline-flex items-center gap-1.5 text-xs text-zinc-400">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            Updating live
+          </span>
 
           <Button
             variant="ghost"
             size="icon"
             onClick={() => refetch()}
             className="h-7 w-7 text-zinc-400 hover:text-zinc-100"
+            aria-label="Refresh analytics"
             title="Refresh analytics"
           >
             <RefreshCw className={`h-3 w-3 ${isLoading ? "animate-spin" : ""}`} />
@@ -124,27 +133,18 @@ export const AnalyticsPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Link Identity Banner */}
+      {/* Link identity header */}
       <motion.div
         variants={cardEntranceVariants}
         initial="hidden"
         animate="visible"
-        className="w-full rounded-xl border border-line-subtle bg-card px-5 py-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] sm:px-8 sm:py-8 space-y-3"
+        className="w-full"
       >
-        <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-indigo-300/80">// Analytics</p>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="space-y-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <span className="text-lg font-bold font-mono text-indigo-400">
-                {displayShortCode}
-              </span>
-              <Badge variant="brand" className="text-[10px] font-mono">
-                Live URL
-              </Badge>
-            </div>
-            <p className="text-xs text-zinc-400 font-mono">
-              Identifier: <span className="text-zinc-300">{id}</span>
-            </p>
+          <div className="min-w-0">
+            <span className="text-lg font-bold font-mono text-indigo-400">
+              {displayShortCode}
+            </span>
           </div>
 
           <div className="flex items-center gap-2 self-start sm:self-center">
@@ -187,8 +187,8 @@ export const AnalyticsPage: React.FC = () => {
         </div>
       ) : isError ? (
         <div className="rounded-xl border border-red-500/20 bg-card p-6 text-center space-y-3 w-full">
-          <p className="text-xs text-red-400 font-mono">
-            Failed to load analytics telemetry for this link.
+          <p className="text-xs text-red-400">
+            Couldn't load analytics. Try again.
           </p>
           <Button
             variant="outline"
@@ -210,115 +210,113 @@ export const AnalyticsPage: React.FC = () => {
         >
           {/* Card 1: Total Clicks */}
           <div className={TILE}>
-            <div className="flex items-center justify-between text-zinc-400">
-              <span className="text-xs font-medium">Total clicks</span>
-              <Flame className="h-4 w-4 text-zinc-500" />
-            </div>
-            <div>
-              <span className="text-2xl sm:text-3xl font-bold font-mono tabular-nums text-zinc-100">
-                {analytics?.totalClicks ?? 0}
-              </span>
-            </div>
-            <span className="text-[10px] text-zinc-400 font-mono">All-time telemetry</span>
+            <span className="text-xs font-medium text-zinc-400">Total clicks</span>
+            <span className="text-2xl sm:text-3xl font-bold font-mono tabular-nums text-zinc-100">
+              {formatCount(analytics?.totalClicks ?? 0)}
+            </span>
           </div>
 
           {/* Card 2: Top Country */}
           <div className={TILE}>
-            <div className="flex items-center justify-between text-zinc-400">
-              <span className="text-xs font-medium">Top country</span>
-              <Globe className="h-4 w-4 text-zinc-500" />
-            </div>
-            <div>
-              <span className="text-xl sm:text-2xl font-bold font-mono truncate text-zinc-100 block">
-                {topCountry ? topCountry.country : "—"}
-              </span>
-            </div>
-            <span className="text-[10px] text-zinc-400 font-mono">
-              {topCountry ? `${topCountry.clicks} clicks` : "No geo data yet"}
+            <span className="text-xs font-medium text-zinc-400">Top country</span>
+            <span className="text-xl sm:text-2xl font-bold font-mono truncate text-zinc-100 block">
+              {topCountry ? getCountryName(topCountry.country) : "—"}
             </span>
           </div>
 
           {/* Card 3: Top Referrer */}
           <div className={TILE}>
-            <div className="flex items-center justify-between text-zinc-400">
-              <span className="text-xs font-medium">Top referrer</span>
-              <Compass className="h-4 w-4 text-zinc-500" />
-            </div>
-            <div>
-              <span
-                className="text-lg sm:text-xl font-bold font-mono truncate text-zinc-100 block max-w-full"
-                title={topReferrer?.referrer || undefined}
-              >
-                {topReferrer ? topReferrer.referrer : "Direct"}
-              </span>
-            </div>
-            <span className="text-[10px] text-zinc-400 font-mono">
-              {topReferrer ? `${topReferrer.clicks} clicks` : "Direct navigation"}
+            <span className="text-xs font-medium text-zinc-400">Top referrer</span>
+            <span
+              className="text-lg sm:text-xl font-bold font-mono truncate text-zinc-100 block max-w-full"
+              title={topReferrer?.referrer || undefined}
+            >
+              {topReferrer ? topReferrer.referrer : "Direct"}
             </span>
           </div>
 
           {/* Card 4: Primary Device */}
           <div className={TILE}>
-            <div className="flex items-center justify-between text-zinc-400">
-              <span className="text-xs font-medium">Primary device</span>
-              <Smartphone className="h-4 w-4 text-zinc-500" />
-            </div>
-            <div>
-              <span className="text-xl sm:text-2xl font-bold font-mono text-zinc-100 block">
-                {primaryDevice}
-              </span>
-            </div>
-            <span className="text-[10px] text-zinc-400 font-mono">
-              {(analytics?.totalClicks ?? 0) > (analytics?.clicks?.items?.length ?? 0)
-                ? `Latest ${analytics?.clicks?.items?.length ?? 0} clicks`
-                : "User-agent classification"}
+            <span className="text-xs font-medium text-zinc-400">Primary device</span>
+            <span className="text-xl sm:text-2xl font-bold font-mono text-zinc-100 block">
+              {primaryDevice}
             </span>
           </div>
         </motion.div>
       )}
 
-      {/* SVG Spline Velocity Chart */}
-      <motion.div
-        variants={cardEntranceVariants}
-        initial="hidden"
-        animate="visible"
-        className="w-full"
-      >
-        <ClickTimelineChart
-          clicks={analytics?.clicks?.items ?? []}
-          totalClicks={analytics?.totalClicks ?? 0}
-        />
-      </motion.div>
+      {/* Chart, breakdowns and clicks stream: skeletons on cold load so the sections
+          never flash their "no data yet" empty states before the request resolves.
+          Hidden entirely on error — the KPI block above already shows the retry card. */}
+      {isLoading ? (
+        <div className="w-full space-y-6">
+          <div className={CARD_SKELETON}>
+            <div className="h-4 w-32 bg-white/5 rounded" />
+            <div className="h-[200px] w-full bg-white/5 rounded-lg" />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
+            {Array.from({ length: 2 }).map((_, i) => (
+              <div key={i} className={CARD_SKELETON}>
+                <div className="h-4 w-28 bg-white/5 rounded" />
+                {Array.from({ length: 4 }).map((_, r) => (
+                  <div key={r} className="h-6 w-full bg-white/5 rounded" />
+                ))}
+              </div>
+            ))}
+          </div>
+          <div className={CARD_SKELETON}>
+            <div className="h-4 w-36 bg-white/5 rounded" />
+            {Array.from({ length: 5 }).map((_, r) => (
+              <div key={r} className="h-8 w-full bg-white/5 rounded" />
+            ))}
+          </div>
+        </div>
+      ) : isError ? null : (
+        <>
+          {/* SVG Spline Velocity Chart */}
+          <motion.div
+            variants={cardEntranceVariants}
+            initial="hidden"
+            animate="visible"
+            className="w-full"
+          >
+            <ClickTimelineChart
+              clicks={analytics?.clicks?.items ?? []}
+              totalClicks={analytics?.totalClicks ?? 0}
+            />
+          </motion.div>
 
-      {/* Granular Breakdowns Grid */}
-      <motion.div
-        variants={cardEntranceVariants}
-        initial="hidden"
-        animate="visible"
-        className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full"
-      >
-        <GeographicBreakdown
-          topCountries={analytics?.topCountries ?? []}
-          totalClicks={analytics?.totalClicks ?? 0}
-        />
-        <DeviceBreakdown
-          clicks={analytics?.clicks?.items ?? []}
-          totalClicks={analytics?.totalClicks ?? 0}
-        />
-      </motion.div>
+          {/* Granular Breakdowns Grid */}
+          <motion.div
+            variants={cardEntranceVariants}
+            initial="hidden"
+            animate="visible"
+            className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full"
+          >
+            <GeographicBreakdown
+              topCountries={analytics?.topCountries ?? []}
+              totalClicks={analytics?.totalClicks ?? 0}
+            />
+            <DeviceBreakdown
+              clicks={analytics?.clicks?.items ?? []}
+              totalClicks={analytics?.totalClicks ?? 0}
+            />
+          </motion.div>
 
-      {/* Real-Time Recent Clicks Audit Stream */}
-      <motion.div
-        variants={cardEntranceVariants}
-        initial="hidden"
-        animate="visible"
-        className="w-full"
-      >
-        <RecentClicksStream
-          clicks={analytics?.clicks?.items ?? []}
-          totalClicks={analytics?.totalClicks ?? 0}
-        />
-      </motion.div>
+          {/* Real-Time Recent Clicks Audit Stream */}
+          <motion.div
+            variants={cardEntranceVariants}
+            initial="hidden"
+            animate="visible"
+            className="w-full"
+          >
+            <RecentClicksStream
+              clicks={analytics?.clicks?.items ?? []}
+              totalClicks={analytics?.totalClicks ?? 0}
+            />
+          </motion.div>
+        </>
+      )}
     </div>
   );
 };

@@ -134,6 +134,7 @@ export const ClickTimelineChart: React.FC<ClickTimelineChartProps> = ({
             <button
               key={range.value}
               type="button"
+              aria-pressed={activeRange === range.value}
               onClick={() => setActiveRange(range.value)}
               className={`px-3 py-1 rounded-md text-xs font-mono font-medium transition-colors cursor-pointer ${
                 activeRange === range.value
@@ -290,7 +291,7 @@ export const ClickTimelineChart: React.FC<ClickTimelineChartProps> = ({
           <Info className="h-3.5 w-3.5 text-zinc-500 shrink-0" />
           <span>
             {totalClicks === 0
-              ? "No clicks recorded on this link yet. Real-time telemetry will stream here as clicks occur."
+              ? "No clicks yet. They'll show up here as people open your link."
               : isSampled
                 ? "No sampled clicks in this window. Older clicks aren't plotted."
                 : "0 clicks detected in this specific time window."}

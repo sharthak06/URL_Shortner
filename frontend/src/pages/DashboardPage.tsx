@@ -28,9 +28,9 @@ export const DashboardPage: React.FC = () => {
   if (isLoading) {
     return (
       <div className="flex flex-1 items-center justify-center p-8">
-        <div className="flex items-center gap-2 text-sm text-zinc-400 font-mono">
+        <div className="flex items-center gap-2 text-sm text-zinc-400">
           <span className="h-2 w-2 rounded-full bg-indigo-500 animate-ping" />
-          <span>Hydrating session...</span>
+          <span>Loading…</span>
         </div>
       </div>
     );
@@ -50,17 +50,13 @@ export const DashboardPage: React.FC = () => {
           variants={sectionRevealVariants}
           initial="hidden"
           animate="visible"
-          className="rounded-xl border border-line-subtle bg-card px-5 py-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] sm:px-8 sm:py-8"
         >
-          <div className="space-y-2">
-            <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-indigo-300/80">// Overview</p>
-            <div className="space-y-1">
-              <h1 className="font-display text-2xl font-semibold tracking-[-0.02em] text-balance text-zinc-100 sm:text-3xl">
-                {getGreeting()}
-                {firstName && `, ${firstName}`}
-              </h1>
-              <p className="text-sm text-pretty text-zinc-400">Create, share and track your short links.</p>
-            </div>
+          <div className="space-y-1">
+            <h1 className="font-display text-2xl font-semibold tracking-[-0.02em] text-balance text-zinc-100 sm:text-3xl">
+              {getGreeting()}
+              {firstName && `, ${firstName}`}
+            </h1>
+            <p className="text-sm text-pretty text-zinc-400">Create, share and track your short links.</p>
           </div>
         </motion.div>
 

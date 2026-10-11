@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import type { ShortURL } from "@/types/url.types";
 import { Button } from "@/components/ui/button";
@@ -50,7 +50,6 @@ export const LINK_ROW_GRID =
 export const LinkRow: React.FC<LinkRowProps> = ({ url, onOpenQr, onEdit, onDelete }) => {
   const [copied, setCopied] = useState(false);
   const [faviconError, setFaviconError] = useState(false);
-  const navigate = useNavigate();
 
   const shortUrlDisplay = getShortUrlDisplay(url.shortCode);
   const faviconUrl = getDomainFaviconUrl(url.originalUrl);
@@ -80,20 +79,14 @@ export const LinkRow: React.FC<LinkRowProps> = ({ url, onOpenQr, onEdit, onDelet
       exit="exit"
       layout="position"
     >
+      {/* Non-interactive container: the short-code below is the real analytics link, and its
+          ::after overlay makes the whole row a single click/focus target (stretched-link
+          pattern) — so no role="button" wrapping interactive children. Genuinely interactive
+          descendants (destination links, action buttons) sit above the overlay via z-10. */}
       <div
-        role="button"
-        tabIndex={0}
-        onClick={() => navigate(analyticsPath)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            navigate(analyticsPath);
-          }
-        }}
-        aria-label={`View analytics for ${shortUrlDisplay}`}
         className={cn(
           LINK_ROW_GRID,
-          "group relative cursor-pointer px-3 py-3 transition-colors duration-150 hover:bg-white/[0.02] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-400/60 sm:px-4"
+          "group relative px-3 py-3.5 transition-colors duration-150 hover:bg-white/[0.02] sm:px-4"
         )}
       >
         {/* Short link column: favicon + short link/destination stack */}
@@ -115,17 +108,19 @@ export const LinkRow: React.FC<LinkRowProps> = ({ url, onOpenQr, onEdit, onDelet
 
           {/* Short link (primary) + destination (secondary, mobile only) */}
           <div className="min-w-0 flex-1">
-            <span className="block w-fit max-w-full truncate font-mono text-sm font-medium text-indigo-400">
+            <Link
+              to={analyticsPath}
+              aria-label={`View analytics for ${shortUrlDisplay}`}
+              className="block w-fit max-w-full truncate font-mono text-sm font-medium text-indigo-400 after:absolute after:inset-0 after:content-[''] focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-indigo-400/60"
+            >
               {shortUrlDisplay}
-            </span>
+            </Link>
             <a
               href={url.originalUrl}
               target="_blank"
               rel="noopener noreferrer"
               title={url.originalUrl}
-              onClick={(e) => e.stopPropagation()}
-              onKeyDown={(e) => e.stopPropagation()}
-              className="mt-0.5 flex min-w-0 max-w-full rounded-sm text-xs text-zinc-500 transition-colors hover:text-zinc-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/60 sm:hidden"
+              className="relative z-10 mt-0.5 flex min-w-0 max-w-full rounded-sm text-xs text-zinc-500 transition-colors hover:text-zinc-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/60 sm:hidden"
             >
               <bdi dir="ltr" className="flex min-w-0">
                 <span className="shrink-0 text-zinc-400">{host}</span>
@@ -149,9 +144,7 @@ export const LinkRow: React.FC<LinkRowProps> = ({ url, onOpenQr, onEdit, onDelet
           target="_blank"
           rel="noopener noreferrer"
           title={url.originalUrl}
-          onClick={(e) => e.stopPropagation()}
-          onKeyDown={(e) => e.stopPropagation()}
-          className="hidden min-w-0 max-w-full rounded-sm text-xs text-zinc-500 transition-colors hover:text-zinc-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/60 sm:flex"
+          className="relative z-10 hidden min-w-0 max-w-full rounded-sm text-xs text-zinc-500 transition-colors hover:text-zinc-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/60 sm:flex"
         >
           <bdi dir="ltr" className="flex min-w-0">
             <span className="shrink-0 text-zinc-400">{host}</span>
@@ -180,11 +173,7 @@ export const LinkRow: React.FC<LinkRowProps> = ({ url, onOpenQr, onEdit, onDelet
         </time>
 
         {/* Actions */}
-        <div
-          onClick={(e) => e.stopPropagation()}
-          onKeyDown={(e) => e.stopPropagation()}
-          className={cn("flex shrink-0 items-center gap-0.5", ACTIONS_REVEAL)}
-        >
+        <div className={cn("relative z-10 flex shrink-0 items-center gap-0.5", ACTIONS_REVEAL)}>
           <Button
             variant="ghost"
             size="icon"
@@ -250,4 +239,4 @@ export const LinkRow: React.FC<LinkRowProps> = ({ url, onOpenQr, onEdit, onDelet
 
 /** The bordered list that holds rows. Shared with FeedSkeleton so loading → loaded doesn't shift. */
 export const LINK_LIST_FRAME =
-  "divide-y divide-line-subtle overflow-hidden rounded-xl border border-line-subtle bg-card shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]";
+  "divide-y divide-line-subtle overflow-hidden rounded-xl border border-line-subtle bg-card";
